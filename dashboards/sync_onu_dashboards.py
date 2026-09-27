@@ -55,7 +55,7 @@ def widget(w, x, y, width, height):
     return dict(w, x=str(x), y=str(y), width=str(width), height=str(height))
 
 
-def gauge(itemid, desc, vmin, vmax, thresholds):
+def gauge(itemid, desc, vmin, vmax, thresholds, title=""):
     fields = [f(4, "itemid.0", itemid), f(0, "angle", 180), f(0, "min", vmin), f(0, "max", vmax),
               f(0, "show.0", 1), f(0, "show.1", 2), f(0, "show.2", 4), f(0, "show.3", 5),
               f(1, "description", desc), f(0, "desc_size", 15), f(0, "desc_bold", 1),
@@ -63,11 +63,11 @@ def gauge(itemid, desc, vmin, vmax, thresholds):
               f(0, "decimal_places", 2), f(0, "units_size", 20)]
     for i, (thr, color) in enumerate(thresholds):
         fields += [f(1, f"thresholds.{i}.color", color), f(1, f"thresholds.{i}.threshold", str(thr))]
-    return {"type": "gauge", "fields": fields}
+    return {"type": "gauge", "name": title, "fields": fields}
 
 
-def item_value(itemid, desc):
-    return {"type": "item", "fields": [
+def item_value(itemid, desc, title=""):
+    return {"type": "item", "name": title, "fields": [
         f(4, "itemid.0", itemid), f(0, "show.0", 1), f(0, "show.1", 2), f(0, "show.2", 3),
         f(0, "show.3", 4), f(1, "description", desc), f(0, "desc_size", 20), f(0, "desc_bold", 1),
         f(0, "value_size", 40), f(0, "units_show", 1), f(0, "decimal_places", 2)]}
@@ -92,18 +92,20 @@ def build_dashboard(hostid, hostname, onu_name, items):
     """items: {'State': itemid, 'Rx power': itemid, ...}"""
     widgets = [
         widget(gauge(items.get("Rx power"), "Rx power, dBm", -35, 0,
-                     [(-26, "E65660"), (-25, "FCCB1D"), (-24, "4CAF50")]), 0, 0, 24, 9),
+                     [(-26, "E65660"), (-25, "FCCB1D"), (-24, "4CAF50")],
+                     "Уровень сигнала Rx (последний, dBm)"), 0, 0, 24, 9),
         widget(gauge(items.get("Tx power"), "Tx power, dBm", 0, 5,
-                     [(1, "FCCB1D"), (2, "4CAF50")]), 24, 0, 24, 9),
-        widget(item_value(items.get("State"), "State (1=Online / 2=Offline)"), 48, 0, 24, 9),
+                     [(1, "FCCB1D"), (2, "4CAF50")],
+                     "Уровень сигнала Tx (последний, dBm)"), 24, 0, 24, 9),
+        widget(item_value(items.get("State"), "State (1=Online / 2=Offline)", "Состояние ONU"), 48, 0, 24, 9),
         widget(svggraph(hostname, [f"ONU [{onu_name}] Rx power", f"ONU [{onu_name}] Tx power"],
                         "Сигнал ONU (Rx/Tx, dBm)", "now-6h"), 0, 9, 72, 12),
         widget(svggraph(hostname, [f"ONU [{onu_name}] Rx power"],
                         "Мощность сигнала Rx, dBm", "now-24h"), 0, 21, 72, 12),
-        widget(item_value(items.get("Temperature"), "Temperature, C"), 0, 33, 18, 5),
-        widget(item_value(items.get("Voltage"), "Voltage, V"), 18, 33, 18, 5),
-        widget(item_value(items.get("Bias current"), "Bias current, mA"), 36, 33, 18, 5),
-        widget(item_value(items.get("Uptime"), "Uptime"), 54, 33, 18, 5),
+        widget(item_value(items.get("Temperature"), "Temperature, C", "Температура"), 0, 33, 18, 5),
+        widget(item_value(items.get("Voltage"), "Voltage, V", "Напряжение"), 18, 33, 18, 5),
+        widget(item_value(items.get("Bias current"), "Bias current, mA", "Ток смещения"), 36, 33, 18, 5),
+        widget(item_value(items.get("Uptime"), "Uptime", "Uptime ONU"), 54, 33, 18, 5),
         widget(problems_widget(hostid, onu_name), 0, 38, 72, 8),
     ]
     return [{"name": "Абонент", "widgets": widgets}]
