@@ -298,6 +298,34 @@ tools/export_repo.py                              # экспорт шаблон�
 docs/OID_reference.md                             # карта OID
 ```
 
+## Другие OLT (BDCOM P3310B/C/D, Gateray GR-EP-OLT)
+
+В репозитории — три шаблона, покрывающих используемый парк EPON OLT:
+
+| OLT | Модель | Шаблон |
+|---|---|---|
+| `olt_snt1`, `olt_ulej7` | BDCOM P3310D / P3310C | **`C-Data_FD1304E-B1_EPON_OLT`** (та же вендорская MIB `17409`: ONU-имена, статус, Rx/Tx/темп./напряжение/ток, интерфейсы) |
+| `olt_lenina2` | BDCOM P3310B (ПО 10.1.0B) | **`BDCOM_P3310B_EPON_OLT`** — прошивка **не отдаёт EPON MIB по SNMP**: мониторинг системных параметров и интерфейсов, включая логические интерфейсы ONU `EPON0/x:y` (статус абонента up/down, скорость, трафик bps, ошибки) |
+| `olt_fedorenko10`, `olt_melio7` | Gateray GR-EP-OLT1-8 / GR-EP-OLT1-4 | **`Gateray_GR-EP-OLT_EPON_OLT`** — система (CPU, температура, alarm), интерфейсы (GE/PON), LLD ONU по MAC-таблице: имя (HEX→ASCII), статус (2=Offline, 3=Online), **Tx/Rx**, итоги Total ONUs online/offline |
+
+Скрипты:
+* [`tools/create_olt_templates.py`](tools/create_olt_templates.py) — создаёт шаблоны Gateray и BDCOM P3310B через API;
+* создание хостов (SNMP-интерфейс + `{$SNMP_COMMUNITY}` + привязка шаблона) выполняйте в UI
+  или своим скриптом — в репозиторий он не включён, т.к. содержит адреса и community;
+* [`tools/check_all_olts.py`](tools/check_all_olts.py) — контроль сбора данных по всем OLT.
+
+### Масштабирование оптики Gateray
+`Rx/Tx` в вендорской MIB отдаются «сырыми» значениями. В шаблоне используются макросы:
+`{$GATERAY.ONU.TX.SCALE}=0.01`, `{$GATERAY.ONU.RX.SCALE}=0.001`, `{$GATERAY.ONU.RX.OFFSET}=-30`
+(`dBm = raw*SCALE + OFFSET`, значение `0` = «нет сигнала» отбрасывается, плюс проверка диапазона −60…10 dBm).
+При расхождении с веб-интерфейсом OLT поправьте макросы.
+
+### Если OLT отдаёт «only partial data received»
+Для «слабых» OLT (BDCOM P3310C/D при большом числе ONU) помогает отключить combined/bulk-запросы
+на SNMP-интерфейсе хоста: **Use combined requests = off**, `max_repetitions = 1`
+(это же делает [`tools/postfix_olts.py`](tools/postfix_olts.py)).
+
+
 ## Благодарности / отказ от ответственности
 
 Шаблон собран по фактическому анализу SNMP-дерева конкретного устройства (`snmpwalk` + проверка

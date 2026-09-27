@@ -1,0 +1,707 @@
+zabbix_export:
+  version: '7.4'
+  template_groups:
+    - uuid: bab6f0ecb8f84999807a1001a52791c6
+      name: OLT
+  templates:
+    - uuid: ed5d332cdf12463499f1d0a1e14e9459
+      template: BDCOM_P3310B_EPON_OLT
+      name: 'BDCOM P3310B EPON OLT'
+      description: |
+        BDCOM P3310B EPON OLT (firmware 10.1.0B) - SNMP monitoring.
+        
+        This firmware does not expose the EPON ONU MIB (ONU names / optical power) via SNMP, so
+        monitoring covers:
+          * system: name/descr/uptime/location/contact
+          * interfaces (IF-MIB): uplinks, PON ports (EPON0/x) and ONU logical interfaces (EPON0/x:y) -
+            admin/oper status (subscriber online/offline), speed, in/out octets,
+            in/out traffic (bps), in/out errors; tags: interface=<name>, if_type=<EPON|GigaEthernet>
+        ONU optical parameters (Rx/Tx) are NOT available via SNMP on this model/firmware.
+        
+      groups:
+        - name: OLT
+      items:
+        - uuid: c9cb4ed6bd644f1c87a677d9efdb3cbe
+          name: 'Interface admin status (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.2.1.2.2.1.7]'
+          key: if.admin
+          delay: 2m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.2.1.2.2.1.7; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.2.1.2.2.1.7";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf(".");
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+          tags:
+            - tag: scope
+              value: iface
+        - uuid: a1246b7df1974443b2e966ca90d5ef42
+          name: 'Interface input errors (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.2.1.2.2.1.14]'
+          key: if.inerrors
+          delay: 2m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.2.1.2.2.1.14; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.2.1.2.2.1.14";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf(".");
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+          tags:
+            - tag: scope
+              value: iface
+        - uuid: 79e212f679dc462fa18134fe8a20ef3e
+          name: 'Interface input octets (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.2.1.2.2.1.10]'
+          key: if.inoctets
+          delay: 2m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.2.1.2.2.1.10; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.2.1.2.2.1.10";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf(".");
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+          tags:
+            - tag: scope
+              value: iface
+        - uuid: 3fb84c722ede4b5483631fcac47b4ff9
+          name: 'Interface names (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.2.1.2.2.1.2]'
+          key: if.name
+          delay: 2m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.2.1.2.2.1.2; JSON normalised for LLD (adds {#IF_TYPE}).'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.2.1.2.2.1.2";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf(".");
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      var o = {}; o["{" + "#SNMPINDEX}"] = idx; o["{" + "#SNMPVALUE}"] = v;
+                      var t = v.replace(/^.*[\s,]/, "").replace(/[0-9].*$/, "").replace(/[-:]+$/, "");
+                      o["{" + "#IF_TYPE}"] = t ? t : v;
+                      out.push(o);
+                  }
+                  return JSON.stringify(out);
+          tags:
+            - tag: scope
+              value: iface
+        - uuid: 7bc163cf4d824951a81ee4a8437597d5
+          name: 'Interface oper status (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.2.1.2.2.1.8]'
+          key: if.oper
+          delay: 2m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.2.1.2.2.1.8; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.2.1.2.2.1.8";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf(".");
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+          tags:
+            - tag: scope
+              value: iface
+        - uuid: 87a6cc5633c14f308253c52224a8eae5
+          name: 'Interface output errors (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.2.1.2.2.1.20]'
+          key: if.outerrors
+          delay: 2m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.2.1.2.2.1.20; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.2.1.2.2.1.20";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf(".");
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+          tags:
+            - tag: scope
+              value: iface
+        - uuid: 44d96ef9caf240f88e5b3ee3838ce5a7
+          name: 'Interface output octets (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.2.1.2.2.1.16]'
+          key: if.outoctets
+          delay: 2m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.2.1.2.2.1.16; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.2.1.2.2.1.16";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf(".");
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+          tags:
+            - tag: scope
+              value: iface
+        - uuid: 5fade32b77df4631b83e6430450d717c
+          name: 'Interface speed (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.2.1.2.2.1.5]'
+          key: if.speed
+          delay: 5m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.2.1.2.2.1.5; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.2.1.2.2.1.5";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf(".");
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+          tags:
+            - tag: scope
+              value: iface
+        - uuid: a630e121fde54b47ac20aa15a6734967
+          name: 'Device contact'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.4.0
+          key: system.contact
+          delay: 1h
+          value_type: CHAR
+          tags:
+            - tag: scope
+              value: system
+        - uuid: 63f8b0b4519b4ef29cc2e06e3c91c5b1
+          name: 'Device description'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.1.0
+          key: system.descr
+          delay: 1h
+          value_type: TEXT
+          tags:
+            - tag: scope
+              value: system
+        - uuid: f27aefd1101641f184da3524111c76e1
+          name: 'Device location'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.6.0
+          key: system.location
+          delay: 1h
+          value_type: CHAR
+          tags:
+            - tag: scope
+              value: system
+        - uuid: 62728d323e3846e4a2d9f51587781d0d
+          name: 'Device name'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.5.0
+          key: system.name
+          delay: 5m
+          value_type: CHAR
+          tags:
+            - tag: scope
+              value: system
+        - uuid: 497367e0f9894e33bb701f176aad2dbe
+          name: 'Device object ID'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.2.0
+          key: system.objectid
+          delay: 1h
+          value_type: CHAR
+          tags:
+            - tag: scope
+              value: system
+        - uuid: 4e318b93290a4bfab643630a37f24d6a
+          name: 'Device uptime'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.3.0
+          key: system.uptime
+          delay: 5m
+          units: uptime
+          tags:
+            - tag: scope
+              value: system
+      discovery_rules:
+        - uuid: 35bb8d855ecc4ba287485a4840dad828
+          name: 'Interface discovery'
+          type: DEPENDENT
+          key: if.lld
+          description: 'Interfaces (incl. PON ports and ONU logical interfaces) discovered from ifDescr.'
+          item_prototypes:
+            - uuid: 33c975830ac5403aa4dcd0ea3f780f6b
+              name: 'Interface [{#SNMPVALUE}] Admin status'
+              type: DEPENDENT
+              key: 'if.admin[{#SNMPINDEX}]'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+$'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: if.admin
+              tags:
+                - tag: component
+                  value: bdcom
+                - tag: ifindex
+                  value: '{#SNMPINDEX}'
+                - tag: if_type
+                  value: '{#IF_TYPE}'
+                - tag: interface
+                  value: '{#SNMPVALUE}'
+                - tag: scope
+                  value: port
+            - uuid: a9f60cbf4c974c3e99a137546b8161d7
+              name: 'Interface [{#SNMPVALUE}] In traffic'
+              type: DEPENDENT
+              key: 'if.inbps[{#SNMPINDEX}]'
+              value_type: FLOAT
+              units: bps
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+$'
+                  error_handler: DISCARD_VALUE
+                - type: CHANGE_PER_SECOND
+                - type: MULTIPLIER
+                  parameters:
+                    - '8'
+              master_item:
+                key: if.inoctets
+              tags:
+                - tag: component
+                  value: bdcom
+                - tag: ifindex
+                  value: '{#SNMPINDEX}'
+                - tag: if_type
+                  value: '{#IF_TYPE}'
+                - tag: interface
+                  value: '{#SNMPVALUE}'
+                - tag: scope
+                  value: port
+            - uuid: da233bb4fe8b402186d9094fac1b73ea
+              name: 'Interface [{#SNMPVALUE}] In errors'
+              type: DEPENDENT
+              key: 'if.inerrors[{#SNMPINDEX}]'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+$'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: if.inerrors
+              tags:
+                - tag: component
+                  value: bdcom
+                - tag: ifindex
+                  value: '{#SNMPINDEX}'
+                - tag: if_type
+                  value: '{#IF_TYPE}'
+                - tag: interface
+                  value: '{#SNMPVALUE}'
+                - tag: scope
+                  value: port
+              trigger_prototypes:
+                - uuid: 32692a42f6b84843a5da5a69cd3929fb
+                  expression: 'change(/BDCOM_P3310B_EPON_OLT/if.inerrors[{#SNMPINDEX}]) > 0'
+                  recovery_mode: RECOVERY_EXPRESSION
+                  recovery_expression: 'change(/BDCOM_P3310B_EPON_OLT/if.inerrors[{#SNMPINDEX}]) = 0'
+                  name: '[{#SNMPVALUE}] input errors detected'
+                  priority: WARNING
+                  tags:
+                    - tag: component
+                      value: bdcom
+                    - tag: ifindex
+                      value: '{#SNMPINDEX}'
+                    - tag: if_type
+                      value: '{#IF_TYPE}'
+                    - tag: interface
+                      value: '{#SNMPVALUE}'
+                    - tag: scope
+                      value: port
+            - uuid: 2cbd12cc1cc248609340e5dd66af2f6b
+              name: 'Interface [{#SNMPVALUE}] In octets'
+              type: DEPENDENT
+              key: 'if.inoctets[{#SNMPINDEX}]'
+              units: B
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+$'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: if.inoctets
+              tags:
+                - tag: component
+                  value: bdcom
+                - tag: ifindex
+                  value: '{#SNMPINDEX}'
+                - tag: if_type
+                  value: '{#IF_TYPE}'
+                - tag: interface
+                  value: '{#SNMPVALUE}'
+                - tag: scope
+                  value: port
+            - uuid: d044b1dc2b1c421d830e33a0315606be
+              name: 'Interface [{#SNMPVALUE}] Oper status'
+              type: DEPENDENT
+              key: 'if.oper[{#SNMPINDEX}]'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+$'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: if.oper
+              tags:
+                - tag: component
+                  value: bdcom
+                - tag: ifindex
+                  value: '{#SNMPINDEX}'
+                - tag: if_type
+                  value: '{#IF_TYPE}'
+                - tag: interface
+                  value: '{#SNMPVALUE}'
+                - tag: scope
+                  value: port
+            - uuid: bdbe29dad027451b80fe34380969ea66
+              name: 'Interface [{#SNMPVALUE}] Out traffic'
+              type: DEPENDENT
+              key: 'if.outbps[{#SNMPINDEX}]'
+              value_type: FLOAT
+              units: bps
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+$'
+                  error_handler: DISCARD_VALUE
+                - type: CHANGE_PER_SECOND
+                - type: MULTIPLIER
+                  parameters:
+                    - '8'
+              master_item:
+                key: if.outoctets
+              tags:
+                - tag: component
+                  value: bdcom
+                - tag: ifindex
+                  value: '{#SNMPINDEX}'
+                - tag: if_type
+                  value: '{#IF_TYPE}'
+                - tag: interface
+                  value: '{#SNMPVALUE}'
+                - tag: scope
+                  value: port
+            - uuid: a14918348f884f8dbebb2b21212ce7d1
+              name: 'Interface [{#SNMPVALUE}] Out errors'
+              type: DEPENDENT
+              key: 'if.outerrors[{#SNMPINDEX}]'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+$'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: if.outerrors
+              tags:
+                - tag: component
+                  value: bdcom
+                - tag: ifindex
+                  value: '{#SNMPINDEX}'
+                - tag: if_type
+                  value: '{#IF_TYPE}'
+                - tag: interface
+                  value: '{#SNMPVALUE}'
+                - tag: scope
+                  value: port
+              trigger_prototypes:
+                - uuid: c046877b8f51438cba4b8e8b178422f6
+                  expression: 'change(/BDCOM_P3310B_EPON_OLT/if.outerrors[{#SNMPINDEX}]) > 0'
+                  recovery_mode: RECOVERY_EXPRESSION
+                  recovery_expression: 'change(/BDCOM_P3310B_EPON_OLT/if.outerrors[{#SNMPINDEX}]) = 0'
+                  name: '[{#SNMPVALUE}] output errors detected'
+                  priority: WARNING
+                  tags:
+                    - tag: component
+                      value: bdcom
+                    - tag: ifindex
+                      value: '{#SNMPINDEX}'
+                    - tag: if_type
+                      value: '{#IF_TYPE}'
+                    - tag: interface
+                      value: '{#SNMPVALUE}'
+                    - tag: scope
+                      value: port
+            - uuid: 09176104da8e4d5789d4d24bd722410c
+              name: 'Interface [{#SNMPVALUE}] Out octets'
+              type: DEPENDENT
+              key: 'if.outoctets[{#SNMPINDEX}]'
+              units: B
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+$'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: if.outoctets
+              tags:
+                - tag: component
+                  value: bdcom
+                - tag: ifindex
+                  value: '{#SNMPINDEX}'
+                - tag: if_type
+                  value: '{#IF_TYPE}'
+                - tag: interface
+                  value: '{#SNMPVALUE}'
+                - tag: scope
+                  value: port
+            - uuid: e24e25ff42c24e29a5575e86cb8ed087
+              name: 'Interface [{#SNMPVALUE}] Speed'
+              type: DEPENDENT
+              key: 'if.speed[{#SNMPINDEX}]'
+              units: bps
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+$'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: if.speed
+              tags:
+                - tag: component
+                  value: bdcom
+                - tag: ifindex
+                  value: '{#SNMPINDEX}'
+                - tag: if_type
+                  value: '{#IF_TYPE}'
+                - tag: interface
+                  value: '{#SNMPVALUE}'
+                - tag: scope
+                  value: port
+          trigger_prototypes:
+            - uuid: 94e763d1783c46eaa613e7409b03feda
+              expression: 'last(/BDCOM_P3310B_EPON_OLT/if.admin[{#SNMPINDEX}]) = 1 and last(/BDCOM_P3310B_EPON_OLT/if.oper[{#SNMPINDEX}]) = 2'
+              recovery_mode: RECOVERY_EXPRESSION
+              recovery_expression: 'last(/BDCOM_P3310B_EPON_OLT/if.oper[{#SNMPINDEX}]) = 1'
+              name: '[{#SNMPVALUE}] port is down'
+              priority: AVERAGE
+              tags:
+                - tag: component
+                  value: bdcom
+                - tag: ifindex
+                  value: '{#SNMPINDEX}'
+                - tag: if_type
+                  value: '{#IF_TYPE}'
+                - tag: interface
+                  value: '{#SNMPVALUE}'
+                - tag: scope
+                  value: port
+          master_item:
+            key: if.name

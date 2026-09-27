@@ -1,0 +1,1201 @@
+zabbix_export:
+  version: '7.4'
+  template_groups:
+    - uuid: bab6f0ecb8f84999807a1001a52791c6
+      name: OLT
+  templates:
+    - uuid: d013344845df4979bade56a43166e145
+      template: Gateray_GR-EP-OLT_EPON_OLT
+      name: 'Gateray GR-EP-OLT EPON OLT'
+      description: |
+        Gateray GR-EP-OLT (EPON-1U8P / EPON-1U4P) - EPON OLT monitoring via SNMP.
+        
+        Data (enterprise OID .1.3.6.1.4.1.34592):
+          * system: name/descr/uptime/location/contact, CPU load, chassis temperature, alarm string
+          * interfaces (IF-MIB): admin/oper, speed, in/out octets, in/out traffic (bps), in/out errors,
+            tags: interface=<name>, if_type=<GE|PON>
+          * ONU LLD (MAC table .34592.1.3.4.1.1.7.1.1): name (hex-decoded), status (2=Offline, 3=Online),
+            Tx power, Rx power
+          * totals: Total ONUs online / offline
+        
+        IMPORTANT: Rx/Tx scaling is derived from the raw vendor values
+          (assumption: Tx = raw*0.01 dBm, Rx = raw*0.001 - 30 dBm). Verify against the OLT web UI and
+          adjust {$GATERAY.ONU.TX.SCALE} / {$GATERAY.ONU.RX.SCALE} / {$GATERAY.ONU.RX.OFFSET} if needed.
+        
+      groups:
+        - name: OLT
+      items:
+        - uuid: aace23dd2be64e80b051e71b6956c0e3
+          name: 'Total ONUs offline'
+          type: CALCULATED
+          key: gas.epon.total.offline
+          params: 'sum(last_foreach(//gas.onu.offline[*]))'
+          description: 'Calculated: sum(last_foreach(//gas.onu.offline[*]))'
+          preprocessing:
+            - type: CHECK_NOT_SUPPORTED
+              parameters:
+                - '-1'
+              error_handler: CUSTOM_VALUE
+              error_handler_params: '0'
+        - uuid: ec3800541e414191a3615824e9150cfc
+          name: 'Total ONUs online'
+          type: CALCULATED
+          key: gas.epon.total.online
+          params: 'sum(last_foreach(//gas.onu.online[*]))'
+          description: 'Calculated: sum(last_foreach(//gas.onu.online[*]))'
+          preprocessing:
+            - type: CHECK_NOT_SUPPORTED
+              parameters:
+                - '-1'
+              error_handler: CUSTOM_VALUE
+              error_handler_params: '0'
+        - uuid: d0cb3412338f4f01880e1fe5f812a7e1
+          name: 'ONU MAC (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.4.1.34592.1.3.4.1.1.7.1.1]'
+          key: gas.onu.mac
+          delay: 2m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.4.1.34592.1.3.4.1.1.7.1.1; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.4.1.34592.1.3.4.1.1.7.1.1";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf(".");
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      var o = {}; o["{" + "#SNMPINDEX}"] = idx; o["{" + "#SNMPVALUE}"] = v;
+                      out.push(o);
+                  }
+                  return JSON.stringify(out);
+          tags:
+            - tag: scope
+              value: onu
+        - uuid: 23749ea7093641c3ad28e430e34aacf0
+          name: 'ONU name (walk, hex)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.4.1.34592.1.3.4.1.1.3.1.1]'
+          key: gas.onu.name
+          delay: 5m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.4.1.34592.1.3.4.1.1.3.1.1; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.4.1.34592.1.3.4.1.1.3.1.1";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var hex = (c < 0) ? rest : rest.substring(c + 2);
+                      hex = hex.replace(/[^0-9A-Fa-f]/g, "");
+                      var s = "";
+                      for (var j = 0; j + 1 < hex.length; j += 2) {
+                          var code = parseInt(hex.substr(j, 2), 16);
+                          if (code === 0) { break; }
+                          s += String.fromCharCode(code);
+                      }
+                      if (s === "") { s = "<unnamed>"; }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf(".");
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      var o = {}; o["{" + "#SNMPINDEX}"] = idx; o["{" + "#SNMPVALUE}"] = s;
+                      out.push(o);
+                  }
+                  return JSON.stringify(out);
+          tags:
+            - tag: scope
+              value: onu
+        - uuid: ac8be749688c4b38801d117d2869ca2a
+          name: 'ONU Rx (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.4.1.34592.1.3.4.1.1.37.1.1]'
+          key: gas.onu.rx
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.4.1.34592.1.3.4.1.1.37.1.1; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.4.1.34592.1.3.4.1.1.37.1.1";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf(".");
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+          tags:
+            - tag: scope
+              value: onu
+        - uuid: 54490b6496064b6fab02bf8957db94e0
+          name: 'ONU status (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.4.1.34592.1.3.4.1.1.11.1.1]'
+          key: gas.onu.state
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.4.1.34592.1.3.4.1.1.11.1.1; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.4.1.34592.1.3.4.1.1.11.1.1";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf(".");
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+          tags:
+            - tag: scope
+              value: onu
+        - uuid: b34dc2ce24f343ac8dc84efe92f58339
+          name: 'ONU status 2 (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.4.1.34592.1.3.4.1.1.11.1.2]'
+          key: gas.onu.state2
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.4.1.34592.1.3.4.1.1.11.1.2; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.4.1.34592.1.3.4.1.1.11.1.2";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf(".");
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+          tags:
+            - tag: scope
+              value: onu
+        - uuid: 633fb9abbd0841428b40c228d0bdd1f3
+          name: 'ONU Tx (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.4.1.34592.1.3.4.1.1.36.1.1]'
+          key: gas.onu.tx
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.4.1.34592.1.3.4.1.1.36.1.1; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.4.1.34592.1.3.4.1.1.36.1.1";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf(".");
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+          tags:
+            - tag: scope
+              value: onu
+        - uuid: 0fe4e1d688614c858335c49ff2b6411e
+          name: 'Interface admin status (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.2.1.2.2.1.7]'
+          key: if.admin
+          delay: 2m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.2.1.2.2.1.7; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.2.1.2.2.1.7";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf(".");
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+          tags:
+            - tag: scope
+              value: iface
+        - uuid: 9847a20e98cc4dc8ab718536c7e66948
+          name: 'Interface input errors (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.2.1.2.2.1.14]'
+          key: if.inerrors
+          delay: 2m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.2.1.2.2.1.14; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.2.1.2.2.1.14";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf(".");
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+          tags:
+            - tag: scope
+              value: iface
+        - uuid: c02bc53d456148069494b1bd6a439552
+          name: 'Interface input octets (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.2.1.2.2.1.10]'
+          key: if.inoctets
+          delay: 2m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.2.1.2.2.1.10; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.2.1.2.2.1.10";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf(".");
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+          tags:
+            - tag: scope
+              value: iface
+        - uuid: 46787cee8fec46a981150f6a55e8c7e2
+          name: 'Interface names (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.2.1.2.2.1.2]'
+          key: if.name
+          delay: 2m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.2.1.2.2.1.2; JSON normalised for LLD (adds {#IF_TYPE}).'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.2.1.2.2.1.2";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf(".");
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      var o = {}; o["{" + "#SNMPINDEX}"] = idx; o["{" + "#SNMPVALUE}"] = v;
+                      var t = v.replace(/^.*[\s,]/, "").replace(/[0-9].*$/, "").replace(/[-:]+$/, "");
+                      o["{" + "#IF_TYPE}"] = t ? t : v;
+                      out.push(o);
+                  }
+                  return JSON.stringify(out);
+          tags:
+            - tag: scope
+              value: iface
+        - uuid: 3ccbfef528774ef89d35a55165dc5ef6
+          name: 'Interface oper status (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.2.1.2.2.1.8]'
+          key: if.oper
+          delay: 2m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.2.1.2.2.1.8; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.2.1.2.2.1.8";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf(".");
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+          tags:
+            - tag: scope
+              value: iface
+        - uuid: 5e986e01d05048ba8cefe1ff728167b1
+          name: 'Interface output errors (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.2.1.2.2.1.20]'
+          key: if.outerrors
+          delay: 2m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.2.1.2.2.1.20; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.2.1.2.2.1.20";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf(".");
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+          tags:
+            - tag: scope
+              value: iface
+        - uuid: b65600fd1f5b45cca510ea78e301d05d
+          name: 'Interface output octets (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.2.1.2.2.1.16]'
+          key: if.outoctets
+          delay: 2m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.2.1.2.2.1.16; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.2.1.2.2.1.16";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf(".");
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+          tags:
+            - tag: scope
+              value: iface
+        - uuid: df7ec546c0bc4326b683c2fdc45dc461
+          name: 'Interface speed (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.2.1.2.2.1.5]'
+          key: if.speed
+          delay: 5m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.2.1.2.2.1.5; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.2.1.2.2.1.5";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf(".");
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+          tags:
+            - tag: scope
+              value: iface
+        - uuid: 0b60feb611484c9d9d88c5ecedb1d38a
+          name: 'Alarm status'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.4.1.34592.1.3.1.1.7.0
+          key: system.alarm
+          delay: 5m
+          value_type: CHAR
+          tags:
+            - tag: scope
+              value: system
+        - uuid: 949ec8cecfe14534a388bd98f7716213
+          name: 'Device contact'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.4.0
+          key: system.contact
+          delay: 1h
+          value_type: CHAR
+          tags:
+            - tag: scope
+              value: system
+        - uuid: 2c414962a7f8476a91bd292d84677923
+          name: 'CPU load'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.4.1.34592.1.3.1.1.8.0
+          key: system.cpu.load
+          delay: 5m
+          units: '%'
+          tags:
+            - tag: scope
+              value: system
+        - uuid: bfd7e4b09dfd43049614f3ce916a32be
+          name: 'Device description'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.1.0
+          key: system.descr
+          delay: 1h
+          value_type: TEXT
+          tags:
+            - tag: scope
+              value: system
+        - uuid: bc389db4580341869819edf313f93afd
+          name: 'Device location'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.6.0
+          key: system.location
+          delay: 1h
+          value_type: CHAR
+          tags:
+            - tag: scope
+              value: system
+        - uuid: 70c4fbbc0ed843df90e1e0ea40bc9e74
+          name: 'Device name'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.5.0
+          key: system.name
+          delay: 5m
+          value_type: CHAR
+          tags:
+            - tag: scope
+              value: system
+        - uuid: 1170569433a14cd99cc1d1a4cdc7cb45
+          name: 'Device object ID'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.2.0
+          key: system.objectid
+          delay: 1h
+          value_type: CHAR
+          tags:
+            - tag: scope
+              value: system
+        - uuid: 163ea06ce35147bfbd3f7e9e2a878c3a
+          name: 'Chassis temperature'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.4.1.34592.1.3.1.3.4.0
+          key: system.temp
+          delay: 5m
+          units: C
+          tags:
+            - tag: scope
+              value: system
+        - uuid: c854bf9bafa648319fccc2a26199bfc0
+          name: 'Device uptime'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.3.0
+          key: system.uptime
+          delay: 5m
+          units: uptime
+          tags:
+            - tag: scope
+              value: system
+      discovery_rules:
+        - uuid: 40fad83fc66b4fb8a6aed9b60254715d
+          name: 'ONU discovery'
+          type: DEPENDENT
+          key: gas.onu.lld
+          lifetime: 14d
+          description: 'ONUs discovered from the MAC table (.1.3.6.1.4.1.34592.1.3.4.1.1.7.1.1)'
+          item_prototypes:
+            - uuid: 1d7b8606bc284f25b2b3f5c827bdae0a
+              name: 'ONU [{#SNMPVALUE}] Name'
+              type: DEPENDENT
+              key: 'gas.onu.name[{#SNMPINDEX}]'
+              value_type: TEXT
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+              master_item:
+                key: gas.onu.name
+              tags:
+                - tag: component
+                  value: gateray
+                - tag: scope
+                  value: onu
+            - uuid: 90ee47339fb7430b911fb8c5be627260
+              name: 'ONU [{#SNMPVALUE}] Offline flag'
+              type: DEPENDENT
+              key: 'gas.onu.offline[{#SNMPINDEX}]'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return (data[i].val === "2") ? 1 : 0; }
+                      }
+                      return 0;
+              master_item:
+                key: gas.onu.state
+              tags:
+                - tag: component
+                  value: gateray
+                - tag: scope
+                  value: onu
+            - uuid: 12818ff87ff74d228256efd9f49afce1
+              name: 'ONU [{#SNMPVALUE}] Online flag'
+              type: DEPENDENT
+              key: 'gas.onu.online[{#SNMPINDEX}]'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return (data[i].val === "3") ? 1 : 0; }
+                      }
+                      return 0;
+              master_item:
+                key: gas.onu.state
+              tags:
+                - tag: component
+                  value: gateray
+                - tag: scope
+                  value: onu
+            - uuid: 5740db281d9c4e968dde9d1487cbde7a
+              name: 'ONU [{#SNMPVALUE}] Rx power'
+              type: DEPENDENT
+              key: 'gas.onu.rx[{#SNMPINDEX}]'
+              value_type: FLOAT
+              units: dBm
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+(\.[0-9]+)?$'
+                  error_handler: DISCARD_VALUE
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var v = parseFloat(value);
+                      if (!isFinite(v) || v <= 0) { return ""; }
+                      return v * {$GATERAY.ONU.RX.SCALE} + {$GATERAY.ONU.RX.OFFSET};
+                - type: IN_RANGE
+                  parameters:
+                    - '-60'
+                    - '10'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: gas.onu.rx
+              tags:
+                - tag: component
+                  value: gateray
+                - tag: scope
+                  value: onu
+            - uuid: ebce629f03374247b51f52991dd80240
+              name: 'ONU [{#SNMPVALUE}] Status 2'
+              type: DEPENDENT
+              key: 'gas.onu.state2[{#SNMPINDEX}]'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+$'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: gas.onu.state2
+              tags:
+                - tag: component
+                  value: gateray
+                - tag: scope
+                  value: onu
+            - uuid: 72a8174c3c4e400aa45003b9f4531de8
+              name: 'ONU [{#SNMPVALUE}] Status (2=Offline, 3=Online)'
+              type: DEPENDENT
+              key: 'gas.onu.state[{#SNMPINDEX}]'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+$'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: gas.onu.state
+              tags:
+                - tag: component
+                  value: gateray
+                - tag: scope
+                  value: onu
+              trigger_prototypes:
+                - uuid: bbdb8010ac0247dc9c769e1294cfab50
+                  expression: 'last(/Gateray_GR-EP-OLT_EPON_OLT/gas.onu.state[{#SNMPINDEX}]) = 2'
+                  recovery_mode: RECOVERY_EXPRESSION
+                  recovery_expression: 'last(/Gateray_GR-EP-OLT_EPON_OLT/gas.onu.state[{#SNMPINDEX}]) = 3'
+                  name: 'ONU [{#SNMPVALUE}] offline'
+                  priority: AVERAGE
+                  tags:
+                    - tag: component
+                      value: gateray
+                    - tag: scope
+                      value: onu
+            - uuid: a12b2882a5944df8922428f6a354fc52
+              name: 'ONU [{#SNMPVALUE}] Tx power'
+              type: DEPENDENT
+              key: 'gas.onu.tx[{#SNMPINDEX}]'
+              value_type: FLOAT
+              units: dBm
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+(\.[0-9]+)?$'
+                  error_handler: DISCARD_VALUE
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var v = parseFloat(value);
+                      if (!isFinite(v) || v <= 0) { return ""; }
+                      return v * {$GATERAY.ONU.TX.SCALE};
+                - type: IN_RANGE
+                  parameters:
+                    - '-60'
+                    - '10'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: gas.onu.tx
+              tags:
+                - tag: component
+                  value: gateray
+                - tag: scope
+                  value: onu
+              trigger_prototypes:
+                - uuid: e464696b319a49dca4d615d4280ce407
+                  expression: 'last(/Gateray_GR-EP-OLT_EPON_OLT/gas.onu.tx[{#SNMPINDEX}]) < 0.5 or last(/Gateray_GR-EP-OLT_EPON_OLT/gas.onu.tx[{#SNMPINDEX}]) > 5'
+                  recovery_mode: RECOVERY_EXPRESSION
+                  recovery_expression: 'last(/Gateray_GR-EP-OLT_EPON_OLT/gas.onu.tx[{#SNMPINDEX}]) >= 0.5 and last(/Gateray_GR-EP-OLT_EPON_OLT/gas.onu.tx[{#SNMPINDEX}]) <= 5'
+                  name: 'ONU [{#SNMPVALUE}] Tx power out of range'
+                  priority: WARNING
+                  tags:
+                    - tag: component
+                      value: gateray
+                    - tag: scope
+                      value: onu
+          master_item:
+            key: gas.onu.mac
+        - uuid: e12ff7aa672e4d5b9081aa6cea56c038
+          name: 'Interface discovery'
+          type: DEPENDENT
+          key: if.lld
+          description: 'Interfaces (incl. PON ports and ONU logical interfaces) discovered from ifDescr.'
+          item_prototypes:
+            - uuid: ee59e38e98de4842a861b38930ae1cb7
+              name: 'Interface [{#SNMPVALUE}] Admin status'
+              type: DEPENDENT
+              key: 'if.admin[{#SNMPINDEX}]'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+$'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: if.admin
+              tags:
+                - tag: component
+                  value: gateray
+                - tag: ifindex
+                  value: '{#SNMPINDEX}'
+                - tag: if_type
+                  value: '{#IF_TYPE}'
+                - tag: interface
+                  value: '{#SNMPVALUE}'
+                - tag: scope
+                  value: port
+            - uuid: 4911b556f64e49a28b6a7e1bbecb2ce3
+              name: 'Interface [{#SNMPVALUE}] In traffic'
+              type: DEPENDENT
+              key: 'if.inbps[{#SNMPINDEX}]'
+              value_type: FLOAT
+              units: bps
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+$'
+                  error_handler: DISCARD_VALUE
+                - type: CHANGE_PER_SECOND
+                - type: MULTIPLIER
+                  parameters:
+                    - '8'
+              master_item:
+                key: if.inoctets
+              tags:
+                - tag: component
+                  value: gateray
+                - tag: ifindex
+                  value: '{#SNMPINDEX}'
+                - tag: if_type
+                  value: '{#IF_TYPE}'
+                - tag: interface
+                  value: '{#SNMPVALUE}'
+                - tag: scope
+                  value: port
+            - uuid: 5b2df914a16e4851aeba79b7201f928d
+              name: 'Interface [{#SNMPVALUE}] In errors'
+              type: DEPENDENT
+              key: 'if.inerrors[{#SNMPINDEX}]'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+$'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: if.inerrors
+              tags:
+                - tag: component
+                  value: gateray
+                - tag: ifindex
+                  value: '{#SNMPINDEX}'
+                - tag: if_type
+                  value: '{#IF_TYPE}'
+                - tag: interface
+                  value: '{#SNMPVALUE}'
+                - tag: scope
+                  value: port
+              trigger_prototypes:
+                - uuid: 06b5035c479f400eb1ff08dd3b354eea
+                  expression: 'change(/Gateray_GR-EP-OLT_EPON_OLT/if.inerrors[{#SNMPINDEX}]) > 0'
+                  recovery_mode: RECOVERY_EXPRESSION
+                  recovery_expression: 'change(/Gateray_GR-EP-OLT_EPON_OLT/if.inerrors[{#SNMPINDEX}]) = 0'
+                  name: '[{#SNMPVALUE}] input errors detected'
+                  priority: WARNING
+                  tags:
+                    - tag: component
+                      value: gateray
+                    - tag: ifindex
+                      value: '{#SNMPINDEX}'
+                    - tag: if_type
+                      value: '{#IF_TYPE}'
+                    - tag: interface
+                      value: '{#SNMPVALUE}'
+                    - tag: scope
+                      value: port
+            - uuid: c584a37eb91a4dc4aa0843c5bd3c5552
+              name: 'Interface [{#SNMPVALUE}] In octets'
+              type: DEPENDENT
+              key: 'if.inoctets[{#SNMPINDEX}]'
+              units: B
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+$'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: if.inoctets
+              tags:
+                - tag: component
+                  value: gateray
+                - tag: ifindex
+                  value: '{#SNMPINDEX}'
+                - tag: if_type
+                  value: '{#IF_TYPE}'
+                - tag: interface
+                  value: '{#SNMPVALUE}'
+                - tag: scope
+                  value: port
+            - uuid: 62d736d5ce9b4eeaa7c3e08528de49f9
+              name: 'Interface [{#SNMPVALUE}] Oper status'
+              type: DEPENDENT
+              key: 'if.oper[{#SNMPINDEX}]'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+$'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: if.oper
+              tags:
+                - tag: component
+                  value: gateray
+                - tag: ifindex
+                  value: '{#SNMPINDEX}'
+                - tag: if_type
+                  value: '{#IF_TYPE}'
+                - tag: interface
+                  value: '{#SNMPVALUE}'
+                - tag: scope
+                  value: port
+            - uuid: 31380830cdcb4cebb61980cdb906fa77
+              name: 'Interface [{#SNMPVALUE}] Out traffic'
+              type: DEPENDENT
+              key: 'if.outbps[{#SNMPINDEX}]'
+              value_type: FLOAT
+              units: bps
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+$'
+                  error_handler: DISCARD_VALUE
+                - type: CHANGE_PER_SECOND
+                - type: MULTIPLIER
+                  parameters:
+                    - '8'
+              master_item:
+                key: if.outoctets
+              tags:
+                - tag: component
+                  value: gateray
+                - tag: ifindex
+                  value: '{#SNMPINDEX}'
+                - tag: if_type
+                  value: '{#IF_TYPE}'
+                - tag: interface
+                  value: '{#SNMPVALUE}'
+                - tag: scope
+                  value: port
+            - uuid: 94b901bdbfe64fd7accd35c7dee6cb13
+              name: 'Interface [{#SNMPVALUE}] Out errors'
+              type: DEPENDENT
+              key: 'if.outerrors[{#SNMPINDEX}]'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+$'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: if.outerrors
+              tags:
+                - tag: component
+                  value: gateray
+                - tag: ifindex
+                  value: '{#SNMPINDEX}'
+                - tag: if_type
+                  value: '{#IF_TYPE}'
+                - tag: interface
+                  value: '{#SNMPVALUE}'
+                - tag: scope
+                  value: port
+              trigger_prototypes:
+                - uuid: 3fa0177a24e04c2f9abfffa5846377cf
+                  expression: 'change(/Gateray_GR-EP-OLT_EPON_OLT/if.outerrors[{#SNMPINDEX}]) > 0'
+                  recovery_mode: RECOVERY_EXPRESSION
+                  recovery_expression: 'change(/Gateray_GR-EP-OLT_EPON_OLT/if.outerrors[{#SNMPINDEX}]) = 0'
+                  name: '[{#SNMPVALUE}] output errors detected'
+                  priority: WARNING
+                  tags:
+                    - tag: component
+                      value: gateray
+                    - tag: ifindex
+                      value: '{#SNMPINDEX}'
+                    - tag: if_type
+                      value: '{#IF_TYPE}'
+                    - tag: interface
+                      value: '{#SNMPVALUE}'
+                    - tag: scope
+                      value: port
+            - uuid: 1e7958db998c4296973fc05f49bbad15
+              name: 'Interface [{#SNMPVALUE}] Out octets'
+              type: DEPENDENT
+              key: 'if.outoctets[{#SNMPINDEX}]'
+              units: B
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+$'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: if.outoctets
+              tags:
+                - tag: component
+                  value: gateray
+                - tag: ifindex
+                  value: '{#SNMPINDEX}'
+                - tag: if_type
+                  value: '{#IF_TYPE}'
+                - tag: interface
+                  value: '{#SNMPVALUE}'
+                - tag: scope
+                  value: port
+            - uuid: b0e17ef8b22249fe9c413572f0d392bb
+              name: 'Interface [{#SNMPVALUE}] Speed'
+              type: DEPENDENT
+              key: 'if.speed[{#SNMPINDEX}]'
+              units: bps
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+$'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: if.speed
+              tags:
+                - tag: component
+                  value: gateray
+                - tag: ifindex
+                  value: '{#SNMPINDEX}'
+                - tag: if_type
+                  value: '{#IF_TYPE}'
+                - tag: interface
+                  value: '{#SNMPVALUE}'
+                - tag: scope
+                  value: port
+          trigger_prototypes:
+            - uuid: 693e945bc7504d889c89f886a6915395
+              expression: 'last(/Gateray_GR-EP-OLT_EPON_OLT/if.admin[{#SNMPINDEX}]) = 1 and last(/Gateray_GR-EP-OLT_EPON_OLT/if.oper[{#SNMPINDEX}]) = 2'
+              recovery_mode: RECOVERY_EXPRESSION
+              recovery_expression: 'last(/Gateray_GR-EP-OLT_EPON_OLT/if.oper[{#SNMPINDEX}]) = 1'
+              name: '[{#SNMPVALUE}] port is down'
+              priority: AVERAGE
+              tags:
+                - tag: component
+                  value: gateray
+                - tag: ifindex
+                  value: '{#SNMPINDEX}'
+                - tag: if_type
+                  value: '{#IF_TYPE}'
+                - tag: interface
+                  value: '{#SNMPVALUE}'
+                - tag: scope
+                  value: port
+          master_item:
+            key: if.name
+      macros:
+        - macro: '{$GATERAY.ONU.RX.OFFSET}'
+          value: '-30'
+          description: 'Rx power offset, dBm = raw*scale+offset'
+        - macro: '{$GATERAY.ONU.RX.SCALE}'
+          value: '0.001'
+          description: 'Rx power scale (raw -> dBm)'
+        - macro: '{$GATERAY.ONU.TX.SCALE}'
+          value: '0.01'
+          description: 'Tx power scale (raw -> dBm)'
