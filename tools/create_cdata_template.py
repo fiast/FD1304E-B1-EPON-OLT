@@ -65,8 +65,10 @@ Graph prototypes (for the built-in "Graph prototype" dashboard widget):
   * Interface [{#SNMPVALUE}] errors    - in/out error packets
 
 Dashboards are created by create_dashboards.py:
-  * "OLT olt_len204 - Абонент (метрики одного абонента)"
-  * "OLT olt_len204 - Абонентские интерфейсы (EPON)"
+  * "OLT <host> - Абонент (метрики одного абонента)"
+  * "OLT <host> - Абонентские интерфейсы (EPON)"
+  * "OLT <host> - Подключения ONU (абоненты)" - honeycomb availability + Rx heat map,
+    ONU table, problems and per-ONU signal graphs
 
 Note: the "[<if>] port is down" trigger fires for every interface with ifAdminStatus=up and
 ifOperStatus=down, including spare (unconnected) ports. Disable it if it is too noisy.

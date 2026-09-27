@@ -77,6 +77,27 @@ def svggraph_widget(x, y, w, h, name, datasets, from_="now-6h"):
             "height": str(h), "fields": fields}
 
 
+def honeycomb_widget(x, y, w, h, name, item_pattern, tag, operator, value, thresholds,
+                     primary_label="{ITEM.NAME}", primary_size=0, secondary_value=True):
+    """Honeycomb (availability/heat map). thresholds = [(numeric_threshold, 'RRGGBB'), ...] ascending."""
+    fields = [f(3, "hostids.0", HOST), f(1, "items.0", item_pattern)]
+    fields += tags_field("item_tags", tag, operator, value)
+    fields += [f(0, "show.0", 1), f(0, "show.1", 2),
+               f(0, "primary_label_type", 0), f(1, "primary_label", primary_label),
+               f(0, "primary_label_decimal_places", 0),
+               f(0, "primary_label_size_type", 0), f(0, "primary_label_size", primary_size or 20),
+               f(0, "secondary_label_type", 1 if secondary_value else 0),
+               f(0, "secondary_label_size_type", 0), f(0, "secondary_label_size", 30),
+               f(0, "secondary_label_decimal_places", 2),
+               f(0, "maintenance", 0)]
+    if not secondary_value:
+        fields += [f(1, "secondary_label", "{ITEM.NAME}")]
+    for i, (thr, color) in enumerate(thresholds):
+        fields += [f(1, f"thresholds.{i}.color", color), f(1, f"thresholds.{i}.threshold", str(thr))]
+    return {"type": "honeycomb", "name": name, "x": str(x), "y": str(y), "width": str(w),
+            "height": str(h), "fields": fields}
+
+
 def create(name, pages):
     delete_dashboard(name)
     r = api("dashboard.create", {"name": name, "display_period": "30", "auto_start": "1",
@@ -120,6 +141,27 @@ def main():
             graphproto_widget(0, 10, 72, 14, "Трафик интерфейсов (bps)", g_traffic, columns=3, rows=2),
             graphproto_widget(0, 24, 72, 14, "Ошибки интерфейсов (пакеты)", g_errors, columns=3, rows=2),
         ]}])
+
+    # ---------- Dashboard 3: ONU subscriber connections ----------
+    print("\n=== Dashboard: ONU subscriber connections ===")
+    create(pre + "Подключения ONU (абоненты)", [{
+        "name": "Подключения ONU",
+        "widgets": [
+            problems_widget(0, 0, 30, 9, "Проблемы абонентских подключений (scope=onu)",
+                            "scope", 1, "onu", 25),
+            itemnav_widget(30, 0, 42, 9,
+                           "Подключения ONU: статус, сигналы, uptime (фильтр: subscriber = <имя>)",
+                           "ONU [*", "subscriber", 4, "", 100),
+            honeycomb_widget(0, 9, 36, 12, "Доступность ONU (Online / Offline)",
+                             "ONU [*] State", "scope", 1, "onu",
+                             [(1, "4CAF50"), (2, "E65660")]),
+            honeycomb_widget(36, 9, 36, 12, "Карта Rx абонентов, dBm (красный < -26)",
+                             "ONU [*] Rx power", "scope", 1, "onu",
+                             [(-26, "E65660"), (-25, "FCCB1D"), (-24, "4CAF50")]),
+            graphproto_widget(0, 21, 72, 14, "Сигнал ONU (Rx/Tx, dBm) по каждому абоненту",
+                              g_signal, columns=3, rows=2),
+        ]}])
+
 
 
 if __name__ == "__main__":
