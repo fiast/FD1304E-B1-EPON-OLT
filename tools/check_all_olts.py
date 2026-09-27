@@ -31,7 +31,7 @@ for hn in HOSTS:
     print(f"   masters: total={len(masters)} collecting={len(ok)} unsupported={len(bad)}")
     for i in bad[:6]:
         print(f"     ! {i['key_']:<24} state={i['state']} err={i['error'][:60]!r}")
-    for pat, label in (("gas.onu.mac[", "ONU (Gateray)"), ("gas.onu.rx[", "ONU Rx (Gateray)"),
+    for pat, label in (("gas.onu.name[", "ONU (Gateray)"), ("gas.onu.rx[", "ONU Rx (Gateray)"),
                        ("cdata.onu.rx[", "ONU Rx"), ("if.oper[", "interface oper"),
                        ("if.inbps[", "interface traffic")):
         items = api("item.get", {"hostids": hid, "output": ["key_", "state", "lastvalue", "lastclock"],

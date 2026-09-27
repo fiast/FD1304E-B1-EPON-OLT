@@ -111,6 +111,85 @@ def js_hex_name(base_oid):
 
 
 
+def gr_js(base_oid, mode="plain"):
+    """JS: parse `snmpwalk` output of a Gateray ONU table into JSON.
+
+    Gateray tables are indexed <PON>.<ONU> (e.g. .7.1.2.5 = column 7, PON 2, ONU 5),
+    so the walk base must NOT contain the PON component and the LLD index is "pon_onu".
+
+    mode:
+      plain -> [{"idx": "2_5", "val": "<raw>"}]
+      magic -> LLD macros {#SNMPINDEX}/{#SNMPVALUE}/{#PON}/{#ONU}
+      str   -> like plain, but for quoted STRING values ("" -> "<unnamed>")
+    """
+    head = ('var base = "%s";\n'
+            'var lines = value.split("\\n");\n'
+            'var out = [];\n'
+            'for (var i = 0; i < lines.length; i++) {\n'
+            '    var line = lines[i];\n'
+            '    var eq = line.indexOf(" = ");\n'
+            '    if (eq < 1) { continue; }\n'
+            '    var oid = line.substring(0, eq);\n'
+            '    var rest = line.substring(eq + 3);\n'
+            '    var c = rest.indexOf(": ");\n'
+            '    var v = (c < 0) ? rest : rest.substring(c + 2);\n'
+            '    var isHex = (rest.indexOf("Hex-STRING") === 0);\n'
+            '    if (v.length > 1 && v.charAt(0) === \'"\' && v.charAt(v.length - 1) === \'"\') '
+            '{ v = v.substring(1, v.length - 1); }\n'
+            '    var p = oid.substring(base.length + 1).split(".");\n'
+            '    if (p.length < 2) { continue; }\n'
+            '    var pon = p[p.length - 2];\n'
+            '    var onu = p[p.length - 1];\n'
+            '    var idx = pon + "_" + onu;\n') % base_oid
+    if mode == "magic":
+        return (head +
+                '    if (v.indexOf(" ") >= 0) {\n'
+                '        var mac = v.replace(/[^0-9A-Fa-f]/g, "");\n'
+                '        if (mac.length === 12) {\n'
+                '            v = "";\n'
+                '            for (var j = 0; j < 12; j += 2) { v += (j ? ":" : "") + mac.substr(j, 2).toUpperCase(); }\n'
+                '        }\n'
+                '    }\n'
+                '    var o = {}; o["{" + "#SNMPINDEX}"] = idx; o["{" + "#SNMPVALUE}"] = v;\n'
+                '    o["{" + "#PON}"] = pon; o["{" + "#ONU}"] = onu;\n'
+                '    out.push(o);\n'
+                '}\nreturn JSON.stringify(out);')
+    if mode == "str":
+        return (head +
+                '    if (isHex) {\n'
+                '        var h = v.replace(/[^0-9A-Fa-f]/g, "");\n'
+                '        var s = "";\n'
+                '        for (var j = 0; j + 1 < h.length; j += 2) {\n'
+                '            var code = parseInt(h.substr(j, 2), 16);\n'
+                '            if (code === 0) { break; }\n'
+                '            s += String.fromCharCode(code);\n'
+                '        }\n'
+                '        v = s;\n'
+                '    }\n'
+                '    if (v === "") { v = "<unnamed>"; }\n'
+                '    out.push({idx: idx, val: v});\n'
+                '}\nreturn JSON.stringify(out);')
+    return head + '    out.push({idx: idx, val: v});\n}\nreturn JSON.stringify(out);'
+
+
+def gr_js_value(kind):
+    """JS: raw Gateray value -> physical value.
+
+    Verified against `show olt N optical-online-onu` / the NMS ONU table:
+      Rx / Tx power : raw is in 0.1 uW   -> dBm = 10*log10(raw/10000)
+      voltage       : raw/10000 V,  bias: raw/500 mA,  temperature: raw/256 C
+    Raw 0 (and other sentinels) -> empty string (value is discarded).
+    """
+    if kind == "dbm":
+        return ('var v = parseFloat(value);\n'
+                'if (!isFinite(v) || v <= 0 || v > 60000) { return ""; }\n'
+                'return 10 * Math.log(v / 10000) / Math.LN10;')
+    div = {"volt": "10000", "bias": "500"}.get(kind, "256")
+    return ('var v = parseFloat(value);\n'
+            'if (!isFinite(v) || v <= 0) { return ""; }\n'
+            'return v / ' + div + ';')
+
+
 def tpl_get_or_create(host, name, group):
     r = api("template.get", {"output": ["templateid"], "filter": {"host": host}})
     if r:
@@ -121,11 +200,16 @@ def tpl_get_or_create(host, name, group):
     return r["templateids"][0], True
 
 
-def item_upsert(tid, spec, update_preproc=False):
+def item_upsert(tid, spec, update_preproc=False, update_oid=False):
     f = api("item.get", {"output": ["itemid"], "templateids": tid, "filter": {"key_": spec["key_"]}})
     if f:
+        upd = {}
         if update_preproc and spec.get("preprocessing"):
-            api("item.update", {"itemid": f[0]["itemid"], "preprocessing": spec["preprocessing"]})
+            upd["preprocessing"] = spec["preprocessing"]
+        if update_oid and spec.get("snmp_oid"):
+            upd["snmp_oid"] = spec["snmp_oid"]
+        if upd:
+            api("item.update", dict(upd, itemid=f[0]["itemid"]))
         return f[0]["itemid"], False
     return api("item.create", dict(spec, hostid=tid))["itemids"][0], True
 
@@ -142,7 +226,7 @@ def proto_upsert(lldid, spec):
                                   "filter": {"key_": spec["key_"]}})
     if f:
         upd = {"itemid": f[0]["itemid"]}
-        for k in ("tags", "preprocessing", "params", "master_itemid"):
+        for k in ("name", "tags", "preprocessing", "params", "master_itemid"):
             if spec.get(k):
                 upd[k] = spec[k]
         if len(upd) > 1:
@@ -285,49 +369,53 @@ def gateray_system(tid):
     system_items(tid, extra)
 
 
-def gr_conv(kind):
-    """JS: raw vendor value -> dBm (0 = no signal -> empty -> discarded by range check)."""
-    if kind == "rx":
-        return ('var v = parseFloat(value);\n'
-                'if (!isFinite(v) || v <= 0) { return ""; }\n'
-                'return v * {$GATERAY.ONU.RX.SCALE} + {$GATERAY.ONU.RX.OFFSET};')
-    return ('var v = parseFloat(value);\n'
-            'if (!isFinite(v) || v <= 0) { return ""; }\n'
-            'return v * {$GATERAY.ONU.TX.SCALE};')
-
-
 def gateray_onu(tid, tpl_host):
     print("\n=== Gateray: ONU masters ===")
     walks = [
-        ("gas.onu.mac", "ONU MAC (walk)", f"{GR}.7.1.1", js_magic, "2m"),
-        ("gas.onu.name", "ONU name (walk, hex)", f"{GR}.3.1.1", js_hex_name, "5m"),
-        ("gas.onu.state", "ONU status (walk)", f"{GR}.11.1.1", js_plain, "1m"),
-        ("gas.onu.state2", "ONU status 2 (walk)", f"{GR}.11.1.2", js_plain, "1m"),
-        ("gas.onu.tx", "ONU Tx (walk)", f"{GR}.36.1.1", js_plain, "1m"),
-        ("gas.onu.rx", "ONU Rx (walk)", f"{GR}.37.1.1", js_plain, "1m"),
+        ("gas.onu.mac", "ONU MAC (walk)", f"{GR}.7.1", "magic", "5m"),
+        ("gas.onu.name", "ONU description (walk)", f"{GR}.4.1", "str", "5m"),
+        ("gas.onu.state", "ONU state (walk)", f"{GR}.11.1", "plain", "1m"),
+        ("gas.onu.dist", "ONU distance (walk)", f"{GR}.13.1", "plain", "5m"),
+        ("gas.onu.rx", "ONU Rx raw (walk)", f"{GR}.36.1", "plain", "1m"),
+        ("gas.onu.tx", "ONU Tx raw (walk)", f"{GR}.37.1", "plain", "1m"),
+        ("gas.onu.volt", "ONU voltage raw (walk)", f"{GR}.38.1", "plain", "5m"),
+        ("gas.onu.bias", "ONU bias raw (walk)", f"{GR}.39.1", "plain", "5m"),
+        ("gas.onu.temp", "ONU temperature raw (walk)", f"{GR}.40.1", "plain", "5m"),
     ]
-    for key, name, oid, jsfn, delay in walks:
+    for key, name, oid, mode, delay in walks:
         s = {"name": name, "key_": key, "type": 20, "delay": delay, "snmp_oid": f"walk[{oid}]",
-             "value_type": 4, "preprocessing": [pp(21, jsfn(oid))],
-             "description": f"SNMP walk {oid}; JSON normalised for LLD recursion.",
+             "value_type": 4, "preprocessing": [pp(21, gr_js(oid, mode))],
+             "description": f"SNMP walk {oid}; JSON [{{idx,val}}] keyed as <PON>_<ONU> for LLD recursion.",
              "tags": [{"tag": "scope", "value": "onu"}]}
-        _, new = item_upsert(tid, s, update_preproc=True)
+        _, new = item_upsert(tid, s, update_preproc=True, update_oid=True)
         print(f"  {'+' if new else '='} {key}")
+    keep = [w[0] for w in walks]
+    for it in api("item.get", {"output": ["itemid", "key_"], "templateids": tid}):
+        if it["key_"].startswith("gas.onu.") and it["key_"] not in keep:
+            api("item.delete", [it["itemid"]])
+            print(f"  - removed obsolete master {it['key_']}")
 
     print("\n=== Gateray: ONU LLD ===")
     lld, _ = lld_upsert(tid, {"name": "ONU discovery", "key_": "gas.onu.lld", "type": 18,
                               "master_itemid": master(tid, "gas.onu.mac"), "delay": "0", "lifetime": "14d",
                               "description": "ONUs discovered from the MAC table "
-                                             "(.1.3.6.1.4.1.34592.1.3.4.1.1.7.1.1)"})
-    onu_tags = [{"tag": "scope", "value": "onu"}, {"tag": "component", "value": "gateray"}]
+                                             "(.1.3.6.1.4.1.34592.1.3.4.1.1.7.1); the index is <PON>_<ONU>"})
+    onu_tags = [{"tag": "scope", "value": "onu"}, {"tag": "component", "value": "gateray"},
+                {"tag": "pon", "value": "{#PON}"}, {"tag": "onu", "value": "{#ONU}"}]
     protos = [
-        ("Name", "gas.onu.name[{#SNMPINDEX}]", "gas.onu.name", "", 4, None, None),
+        ("Description", "gas.onu.name[{#SNMPINDEX}]", "gas.onu.name", "", 4, None, None),
         ("Status (2=Offline, 3=Online)", "gas.onu.state[{#SNMPINDEX}]", "gas.onu.state", "", 3, INT_RE, None),
-        ("Status 2", "gas.onu.state2[{#SNMPINDEX}]", "gas.onu.state2", "", 3, INT_RE, None),
-        ("Tx power", "gas.onu.tx[{#SNMPINDEX}]", "gas.onu.tx", "dBm", 0, NUM_RE,
-         [pp(21, gr_conv("tx")), pp(13, "-60\n10", eh="1")]),
+        ("Distance", "gas.onu.dist[{#SNMPINDEX}]", "gas.onu.dist", "m", 3, INT_RE, None),
         ("Rx power", "gas.onu.rx[{#SNMPINDEX}]", "gas.onu.rx", "dBm", 0, NUM_RE,
-         [pp(21, gr_conv("rx")), pp(13, "-60\n10", eh="1")]),
+         [pp(21, gr_js_value("dbm")), pp(13, "-50\n12", eh="1")]),
+        ("Tx power", "gas.onu.tx[{#SNMPINDEX}]", "gas.onu.tx", "dBm", 0, NUM_RE,
+         [pp(21, gr_js_value("dbm")), pp(13, "-50\n12", eh="1")]),
+        ("Voltage", "gas.onu.volt[{#SNMPINDEX}]", "gas.onu.volt", "V", 0, NUM_RE,
+         [pp(21, gr_js_value("volt")), pp(13, "0\n5", eh="1")]),
+        ("Bias current", "gas.onu.bias[{#SNMPINDEX}]", "gas.onu.bias", "mA", 0, NUM_RE,
+         [pp(21, gr_js_value("bias")), pp(13, "0\n100", eh="1")]),
+        ("Temperature", "gas.onu.temp[{#SNMPINDEX}]", "gas.onu.temp", "C", 0, NUM_RE,
+         [pp(21, gr_js_value("temp")), pp(13, "-40\n120", eh="1")]),
     ]
     for label, key, mk, units, vt, num_re, extra in protos:
         pre = [pp(21, JS_EXTRACT)]
@@ -335,11 +423,16 @@ def gateray_onu(tid, tpl_host):
             pre.append(pp(14, num_re, eh="1"))
         if extra:
             pre += extra
-        s = {"name": f"ONU [{{#SNMPVALUE}}] {label}", "key_": key, "type": 18, "delay": "0",
-             "master_itemid": master(tid, mk), "value_type": vt, "units": units,
+        s = {"name": f"ONU [PON {{#PON}}/{{#ONU}}] {{#SNMPVALUE}} {label}", "key_": key, "type": 18,
+             "delay": "0", "master_itemid": master(tid, mk), "value_type": vt, "units": units,
              "preprocessing": pre, "tags": onu_tags}
         _, new = proto_upsert(lld, s)
         print(f"  {'+' if new else '='} {key}")
+    keep_protos = [p[1].split("[")[0] for p in protos] + ["gas.onu.online", "gas.onu.offline"]
+    for p in api("itemprototype.get", {"output": ["itemid", "key_"], "discoveryids": lld}):
+        if p["key_"].split("[")[0] not in keep_protos:
+            api("itemprototype.delete", [p["itemid"]])
+            print(f"  - removed obsolete prototype {p['key_']}")
 
     for key, label, want in (("gas.onu.online[{#SNMPINDEX}]", "Online flag", "3"),
                              ("gas.onu.offline[{#SNMPINDEX}]", "Offline flag", "2")):
@@ -363,17 +456,32 @@ def gateray_onu(tid, tpl_host):
         _, new = item_upsert(tid, s)
         print(f"  {'+' if new else '='} {key}")
 
-    trig_upsert(lld, {"description": "ONU [{#SNMPVALUE}] offline", "priority": 3,
-                      "expression": f"last(/{tpl_host}/gas.onu.state[{{#SNMPINDEX}}]) = 2",
+    trig_upsert(lld, {"description": "ONU [{#SNMPVALUE}] (PON {#PON}/{#ONU}) offline", "priority": 3,
+                      "expression": f"last(/{tpl_host}/gas.onu.state[{{#SNMPINDEX}}]) <> 3",
                       "recovery_mode": 1,
                       "recovery_expression": f"last(/{tpl_host}/gas.onu.state[{{#SNMPINDEX}}]) = 3",
                       "tags": onu_tags})
+    st = f"last(/{tpl_host}/gas.onu.state[{{#SNMPINDEX}}]) = 3"
+    st_off = f"last(/{tpl_host}/gas.onu.state[{{#SNMPINDEX}}]) <> 3"
+    tx = f"last(/{tpl_host}/gas.onu.tx[{{#SNMPINDEX}}])"
+    rx = f"last(/{tpl_host}/gas.onu.rx[{{#SNMPINDEX}}])"
+    tp = f"last(/{tpl_host}/gas.onu.temp[{{#SNMPINDEX}}])"
     trig_upsert(lld, {"description": "ONU [{#SNMPVALUE}] Tx power out of range", "priority": 2,
-                      "expression": f"last(/{tpl_host}/gas.onu.tx[{{#SNMPINDEX}}]) < 0.5 or "
-                                    f"last(/{tpl_host}/gas.onu.tx[{{#SNMPINDEX}}]) > 5",
+                      "expression": f"{st} and ({tx} < " + "{$GATERAY.ONU.TX.MIN} or " +
+                                    f"{tx} > " + "{$GATERAY.ONU.TX.MAX})",
                       "recovery_mode": 1,
-                      "recovery_expression": f"last(/{tpl_host}/gas.onu.tx[{{#SNMPINDEX}}]) >= 0.5 and "
-                                             f"last(/{tpl_host}/gas.onu.tx[{{#SNMPINDEX}}]) <= 5",
+                      "recovery_expression": f"{st_off} or ({tx} >= " + "{$GATERAY.ONU.TX.MIN} and " +
+                                             f"{tx} <= " + "{$GATERAY.ONU.TX.MAX})",
+                      "tags": onu_tags})
+    trig_upsert(lld, {"description": "ONU [{#SNMPVALUE}] Rx power low", "priority": 2,
+                      "expression": f"{st} and {rx} < " + "{$GATERAY.ONU.RX.MIN}",
+                      "recovery_mode": 1,
+                      "recovery_expression": f"{st_off} or {rx} >= " + "{$GATERAY.ONU.RX.MIN}",
+                      "tags": onu_tags})
+    trig_upsert(lld, {"description": "ONU [{#SNMPVALUE}] temperature high", "priority": 2,
+                      "expression": f"{st} and {tp} > " + "{$GATERAY.ONU.TEMP.MAX}",
+                      "recovery_mode": 1,
+                      "recovery_expression": f"{st_off} or {tp} <= " + "{$GATERAY.ONU.TEMP.MAX}",
                       "tags": onu_tags})
 
 
@@ -384,13 +492,20 @@ Data (enterprise OID .1.3.6.1.4.1.34592):
   * system: name/descr/uptime/location/contact, CPU load, chassis temperature, alarm string
   * interfaces (IF-MIB): admin/oper, speed, in/out octets, in/out traffic (bps), in/out errors,
     tags: interface=<name>, if_type=<GE|PON>
-  * ONU LLD (MAC table .34592.1.3.4.1.1.7.1.1): name (hex-decoded), status (2=Offline, 3=Online),
-    Tx power, Rx power
+  * ONU LLD from the MAC table (.34592.1.3.4.1.1.7.1). Tables are indexed <PON>.<ONU>, so the
+    LLD index/macros are {#SNMPINDEX}=<PON>_<ONU>, {#PON}, {#ONU}, {#SNMPVALUE}=MAC.
+    Per ONU: description (.4, empty -> "<unnamed>"), state (.11, 2=Offline 3=Online),
+    distance (.13, m), Rx power (.36), Tx power (.37), module voltage (.38),
+    bias current (.39), temperature (.40).
   * totals: Total ONUs online / offline
 
-IMPORTANT: Rx/Tx scaling is derived from the raw vendor values
-  (assumption: Tx = raw*0.01 dBm, Rx = raw*0.001 - 30 dBm). Verify against the OLT web UI and
-  adjust {$GATERAY.ONU.TX.SCALE} / {$GATERAY.ONU.RX.SCALE} / {$GATERAY.ONU.RX.OFFSET} if needed.
+Value decoding (verified against `show olt <n> optical-online-onu` and the NMS ONU table):
+  * Rx/Tx power: raw value is optical power in 0.1 uW  ->  dBm = 10*log10(raw/10000)
+  * voltage: raw/10000 V | bias: raw/500 mA | temperature: raw/256 C
+  * raw 0 / sentinel values are discarded (item becomes unsupported instead of a bogus value)
+
+Thresholds: {$GATERAY.ONU.RX.MIN}, {$GATERAY.ONU.TX.MIN}, {$GATERAY.ONU.TX.MAX},
+{$GATERAY.ONU.TEMP.MAX}.
 """
 
 BDCOM3310B_DESC = """BDCOM P3310B EPON OLT (firmware 10.1.0B) - SNMP monitoring.
@@ -411,10 +526,15 @@ def build_gateray():
     TPL_ID = tid
     print(f"Template {'created' if new else 'exists'}: Gateray_GR-EP-OLT_EPON_OLT (id={tid})")
     api("template.update", {"templateid": tid, "description": GATERAY_DESC})
-    for m, v, d in (("{$GATERAY.ONU.TX.SCALE}", "0.01", "Tx power scale (raw -> dBm)"),
-                    ("{$GATERAY.ONU.RX.SCALE}", "0.001", "Rx power scale (raw -> dBm)"),
-                    ("{$GATERAY.ONU.RX.OFFSET}", "-30", "Rx power offset, dBm = raw*scale+offset")):
+    for m, v, d in (("{$GATERAY.ONU.RX.MIN}", "-27", "ONU Rx power low threshold, dBm"),
+                    ("{$GATERAY.ONU.TX.MIN}", "0.5", "ONU Tx power low threshold, dBm"),
+                    ("{$GATERAY.ONU.TX.MAX}", "5", "ONU Tx power high threshold, dBm"),
+                    ("{$GATERAY.ONU.TEMP.MAX}", "70", "ONU module temperature high threshold, C")):
         macro_upsert(tid, m, v, d)
+    for m in ("{$GATERAY.ONU.TX.SCALE}", "{$GATERAY.ONU.RX.SCALE}", "{$GATERAY.ONU.RX.OFFSET}"):
+        for mm in api("usermacro.get", {"hostids": tid, "filter": {"macro": m}}):
+            api("usermacro.delete", [mm["hostmacroid"]])
+            print(f"  - removed obsolete macro {m}")
     gateray_system(tid)
     interface_masters(tid, "if")
     if_tags = [{"tag": "scope", "value": "port"}, {"tag": "component", "value": "gateray"},

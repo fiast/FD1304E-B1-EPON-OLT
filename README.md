@@ -306,19 +306,39 @@ docs/OID_reference.md                             # карта OID
 |---|---|---|
 | `olt_snt1`, `olt_ulej7` | BDCOM P3310D / P3310C | **`C-Data_FD1304E-B1_EPON_OLT`** (та же вендорская MIB `17409`: ONU-имена, статус, Rx/Tx/темп./напряжение/ток, интерфейсы) |
 | `olt_lenina2` | BDCOM P3310B (ПО 10.1.0B) | **`BDCOM_P3310B_EPON_OLT`** — прошивка **не отдаёт EPON MIB по SNMP**: мониторинг системных параметров и интерфейсов, включая логические интерфейсы ONU `EPON0/x:y` (статус абонента up/down, скорость, трафик bps, ошибки) |
-| `olt_fedorenko10`, `olt_melio7` | Gateray GR-EP-OLT1-8 / GR-EP-OLT1-4 | **`Gateray_GR-EP-OLT_EPON_OLT`** — система (CPU, температура, alarm), интерфейсы (GE/PON), LLD ONU по MAC-таблице: имя (HEX→ASCII), статус (2=Offline, 3=Online), **Tx/Rx**, итоги Total ONUs online/offline |
+| `olt_fedorenko10`, `olt_melio7` | Gateray GR-EP-OLT1-8 / GR-EP-OLT1-4 | **`Gateray_GR-EP-OLT_EPON_OLT`** — система (CPU, температура, alarm), интерфейсы (GE/PON), LLD ONU по MAC-таблице: описание ONU, статус (2=Offline, 3=Online), **Rx/Tx** (дБм), напряжение/ток смещения/температура модуля, дистанция, итоги Total ONUs online/offline |
 
 Скрипты:
 * [`tools/create_olt_templates.py`](tools/create_olt_templates.py) — создаёт шаблоны Gateray и BDCOM P3310B через API;
 * создание хостов (SNMP-интерфейс + `{$SNMP_COMMUNITY}` + привязка шаблона) выполняйте в UI
   или своим скриптом — в репозиторий он не включён, т.к. содержит адреса и community;
-* [`tools/check_all_olts.py`](tools/check_all_olts.py) — контроль сбора данных по всем OLT.
+* [`tools/check_all_olts.py`](tools/check_all_olts.py) — контроль сбора данных по всем OLT;
+* [`tools/verify_gateray.py`](tools/verify_gateray.py) — таблица ONU (MAC/имя/статус/Rx/Tx/V/mA/°C/dist) по хосту;
+* [`tools/refresh_gateray.py`](tools/refresh_gateray.py) — удалить устаревшие `gas.*`-итемы на хостах, чтобы LLD пересоздал их после правки шаблона.
 
-### Масштабирование оптики Gateray
-`Rx/Tx` в вендорской MIB отдаются «сырыми» значениями. В шаблоне используются макросы:
-`{$GATERAY.ONU.TX.SCALE}=0.01`, `{$GATERAY.ONU.RX.SCALE}=0.001`, `{$GATERAY.ONU.RX.OFFSET}=-30`
-(`dBm = raw*SCALE + OFFSET`, значение `0` = «нет сигнала» отбрасывается, плюс проверка диапазона −60…10 dBm).
-При расхождении с веб-интерфейсом OLT поправьте макросы.
+### Формулы декодирования значений Gateray (проверены по `show olt N optical-online-onu`)
+
+Таблицы вендора индексируются `<PON>.<ONU>` (например `.34592.1.3.4.1.1.7.1.2.5` — MAC ONU 5 на PON 2),
+поэтому walk берётся по базе **без** номера PON, а LLD-индекс имеет вид `<PON>_<ONU>`
+(макросы `{#PON}`, `{#ONU}`, `{#SNMPVALUE}` = MAC в формате `AA:BB:CC:DD:EE:FF`).
+
+| Колонка | Значение | Формула |
+|---|---|---|
+| `.4.1` | описание/имя ONU (STRING; пусто → `<unnamed>`) | — |
+| `.11.1` | состояние: 2=Offline, 3=Online | — |
+| `.13.1` | дистанция до OLT | м |
+| `.36.1` | **ONU Rx** | `dBm = 10*log10(raw/10000)` (raw в 0.1 мкВт) |
+| `.37.1` | **ONU Tx** | `dBm = 10*log10(raw/10000)` |
+| `.38.1` | напряжение модуля | `raw/10000` В |
+| `.39.1` | ток смещения | `raw/500` мА |
+| `.40.1` | температура модуля | `raw/256` °C |
+
+Например, raw `.36` = 100 → −20.0 dBm, raw `.37` = 13534 → +1.31 dBm.
+«Нулевые»/мусорные raw отбрасываются (проверка диапазона с `discard value`), а триггеры
+по мощности дополнительно требуют `state = 3`, чтобы не срабатывать на офлайн-ONU.
+Пороговые макросы: `{$GATERAY.ONU.RX.MIN}`, `{$GATERAY.ONU.TX.MIN}`, `{$GATERAY.ONU.TX.MAX}`,
+`{$GATERAY.ONU.TEMP.MAX}`.
+
 
 ### Если OLT отдаёт «only partial data received»
 Для «слабых» OLT (BDCOM P3310C/D при большом числе ONU) помогает отключить combined/bulk-запросы

@@ -14,13 +14,20 @@ zabbix_export:
           * system: name/descr/uptime/location/contact, CPU load, chassis temperature, alarm string
           * interfaces (IF-MIB): admin/oper, speed, in/out octets, in/out traffic (bps), in/out errors,
             tags: interface=<name>, if_type=<GE|PON>
-          * ONU LLD (MAC table .34592.1.3.4.1.1.7.1.1): name (hex-decoded), status (2=Offline, 3=Online),
-            Tx power, Rx power
+          * ONU LLD from the MAC table (.34592.1.3.4.1.1.7.1). Tables are indexed <PON>.<ONU>, so the
+            LLD index/macros are {#SNMPINDEX}=<PON>_<ONU>, {#PON}, {#ONU}, {#SNMPVALUE}=MAC.
+            Per ONU: description (.4, empty -> "<unnamed>"), state (.11, 2=Offline 3=Online),
+            distance (.13, m), Rx power (.36), Tx power (.37), module voltage (.38),
+            bias current (.39), temperature (.40).
           * totals: Total ONUs online / offline
         
-        IMPORTANT: Rx/Tx scaling is derived from the raw vendor values
-          (assumption: Tx = raw*0.01 dBm, Rx = raw*0.001 - 30 dBm). Verify against the OLT web UI and
-          adjust {$GATERAY.ONU.TX.SCALE} / {$GATERAY.ONU.RX.SCALE} / {$GATERAY.ONU.RX.OFFSET} if needed.
+        Value decoding (verified against `show olt <n> optical-online-onu` and the NMS ONU table):
+          * Rx/Tx power: raw value is optical power in 0.1 uW  ->  dBm = 10*log10(raw/10000)
+          * voltage: raw/10000 V | bias: raw/500 mA | temperature: raw/256 C
+          * raw 0 / sentinel values are discarded (item becomes unsupported instead of a bogus value)
+        
+        Thresholds: {$GATERAY.ONU.RX.MIN}, {$GATERAY.ONU.TX.MIN}, {$GATERAY.ONU.TX.MAX},
+        {$GATERAY.ONU.TEMP.MAX}.
         
       groups:
         - name: OLT
@@ -49,19 +56,19 @@ zabbix_export:
                 - '-1'
               error_handler: CUSTOM_VALUE
               error_handler_params: '0'
-        - uuid: d0cb3412338f4f01880e1fe5f812a7e1
-          name: 'ONU MAC (walk)'
+        - uuid: 99416a265b8f413ebb8df5841881cb3a
+          name: 'ONU bias raw (walk)'
           type: SNMP_AGENT
-          snmp_oid: 'walk[.1.3.6.1.4.1.34592.1.3.4.1.1.7.1.1]'
-          key: gas.onu.mac
-          delay: 2m
+          snmp_oid: 'walk[.1.3.6.1.4.1.34592.1.3.4.1.1.39.1]'
+          key: gas.onu.bias
+          delay: 5m
           value_type: TEXT
-          description: 'SNMP walk .1.3.6.1.4.1.34592.1.3.4.1.1.7.1.1; JSON normalised for LLD recursion.'
+          description: 'SNMP walk .1.3.6.1.4.1.34592.1.3.4.1.1.39.1; JSON [{idx,val}] keyed as <PON>_<ONU> for LLD recursion.'
           preprocessing:
             - type: JAVASCRIPT
               parameters:
                 - |
-                  var base = ".1.3.6.1.4.1.34592.1.3.4.1.1.7.1.1";
+                  var base = ".1.3.6.1.4.1.34592.1.3.4.1.1.39.1";
                   var lines = value.split("\n");
                   var out = [];
                   for (var i = 0; i < lines.length; i++) {
@@ -72,11 +79,94 @@ zabbix_export:
                       var rest = line.substring(eq + 3);
                       var c = rest.indexOf(": ");
                       var v = (c < 0) ? rest : rest.substring(c + 2);
+                      var isHex = (rest.indexOf("Hex-STRING") === 0);
                       if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
-                      var idx = oid.substring(base.length + 1);
-                      var d = idx.indexOf(".");
-                      if (d > 0) { idx = idx.substring(0, d); }
+                      var p = oid.substring(base.length + 1).split(".");
+                      if (p.length < 2) { continue; }
+                      var pon = p[p.length - 2];
+                      var onu = p[p.length - 1];
+                      var idx = pon + "_" + onu;
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+          tags:
+            - tag: scope
+              value: onu
+        - uuid: dbfb87deb132402d8b0bca65f9de71fd
+          name: 'ONU distance (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.4.1.34592.1.3.4.1.1.13.1]'
+          key: gas.onu.dist
+          delay: 5m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.4.1.34592.1.3.4.1.1.13.1; JSON [{idx,val}] keyed as <PON>_<ONU> for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.4.1.34592.1.3.4.1.1.13.1";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      var isHex = (rest.indexOf("Hex-STRING") === 0);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var p = oid.substring(base.length + 1).split(".");
+                      if (p.length < 2) { continue; }
+                      var pon = p[p.length - 2];
+                      var onu = p[p.length - 1];
+                      var idx = pon + "_" + onu;
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+          tags:
+            - tag: scope
+              value: onu
+        - uuid: d0cb3412338f4f01880e1fe5f812a7e1
+          name: 'ONU MAC (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.4.1.34592.1.3.4.1.1.7.1]'
+          key: gas.onu.mac
+          delay: 2m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.4.1.34592.1.3.4.1.1.7.1.1; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.4.1.34592.1.3.4.1.1.7.1";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      var isHex = (rest.indexOf("Hex-STRING") === 0);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var p = oid.substring(base.length + 1).split(".");
+                      if (p.length < 2) { continue; }
+                      var pon = p[p.length - 2];
+                      var onu = p[p.length - 1];
+                      var idx = pon + "_" + onu;
+                      if (v.indexOf(" ") >= 0) {
+                          var mac = v.replace(/[^0-9A-Fa-f]/g, "");
+                          if (mac.length === 12) {
+                              v = "";
+                              for (var j = 0; j < 12; j += 2) { v += (j ? ":" : "") + mac.substr(j, 2).toUpperCase(); }
+                          }
+                      }
                       var o = {}; o["{" + "#SNMPINDEX}"] = idx; o["{" + "#SNMPVALUE}"] = v;
+                      o["{" + "#PON}"] = pon; o["{" + "#ONU}"] = onu;
                       out.push(o);
                   }
                   return JSON.stringify(out);
@@ -86,7 +176,7 @@ zabbix_export:
         - uuid: 23749ea7093641c3ad28e430e34aacf0
           name: 'ONU name (walk, hex)'
           type: SNMP_AGENT
-          snmp_oid: 'walk[.1.3.6.1.4.1.34592.1.3.4.1.1.3.1.1]'
+          snmp_oid: 'walk[.1.3.6.1.4.1.34592.1.3.4.1.1.4.1]'
           key: gas.onu.name
           delay: 5m
           value_type: TEXT
@@ -95,47 +185,7 @@ zabbix_export:
             - type: JAVASCRIPT
               parameters:
                 - |
-                  var base = ".1.3.6.1.4.1.34592.1.3.4.1.1.3.1.1";
-                  var lines = value.split("\n");
-                  var out = [];
-                  for (var i = 0; i < lines.length; i++) {
-                      var line = lines[i];
-                      var eq = line.indexOf(" = ");
-                      if (eq < 1) { continue; }
-                      var oid = line.substring(0, eq);
-                      var rest = line.substring(eq + 3);
-                      var c = rest.indexOf(": ");
-                      var hex = (c < 0) ? rest : rest.substring(c + 2);
-                      hex = hex.replace(/[^0-9A-Fa-f]/g, "");
-                      var s = "";
-                      for (var j = 0; j + 1 < hex.length; j += 2) {
-                          var code = parseInt(hex.substr(j, 2), 16);
-                          if (code === 0) { break; }
-                          s += String.fromCharCode(code);
-                      }
-                      if (s === "") { s = "<unnamed>"; }
-                      var idx = oid.substring(base.length + 1);
-                      var d = idx.indexOf(".");
-                      if (d > 0) { idx = idx.substring(0, d); }
-                      var o = {}; o["{" + "#SNMPINDEX}"] = idx; o["{" + "#SNMPVALUE}"] = s;
-                      out.push(o);
-                  }
-                  return JSON.stringify(out);
-          tags:
-            - tag: scope
-              value: onu
-        - uuid: ac8be749688c4b38801d117d2869ca2a
-          name: 'ONU Rx (walk)'
-          type: SNMP_AGENT
-          snmp_oid: 'walk[.1.3.6.1.4.1.34592.1.3.4.1.1.37.1.1]'
-          key: gas.onu.rx
-          value_type: TEXT
-          description: 'SNMP walk .1.3.6.1.4.1.34592.1.3.4.1.1.37.1.1; JSON normalised for LLD recursion.'
-          preprocessing:
-            - type: JAVASCRIPT
-              parameters:
-                - |
-                  var base = ".1.3.6.1.4.1.34592.1.3.4.1.1.37.1.1";
+                  var base = ".1.3.6.1.4.1.34592.1.3.4.1.1.4.1";
                   var lines = value.split("\n");
                   var out = [];
                   for (var i = 0; i < lines.length; i++) {
@@ -146,10 +196,59 @@ zabbix_export:
                       var rest = line.substring(eq + 3);
                       var c = rest.indexOf(": ");
                       var v = (c < 0) ? rest : rest.substring(c + 2);
+                      var isHex = (rest.indexOf("Hex-STRING") === 0);
                       if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
-                      var idx = oid.substring(base.length + 1);
-                      var d = idx.indexOf(".");
-                      if (d > 0) { idx = idx.substring(0, d); }
+                      var p = oid.substring(base.length + 1).split(".");
+                      if (p.length < 2) { continue; }
+                      var pon = p[p.length - 2];
+                      var onu = p[p.length - 1];
+                      var idx = pon + "_" + onu;
+                      if (isHex) {
+                          var h = v.replace(/[^0-9A-Fa-f]/g, "");
+                          var s = "";
+                          for (var j = 0; j + 1 < h.length; j += 2) {
+                              var code = parseInt(h.substr(j, 2), 16);
+                              if (code === 0) { break; }
+                              s += String.fromCharCode(code);
+                          }
+                          v = s;
+                      }
+                      if (v === "") { v = "<unnamed>"; }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+          tags:
+            - tag: scope
+              value: onu
+        - uuid: ac8be749688c4b38801d117d2869ca2a
+          name: 'ONU Rx (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.4.1.34592.1.3.4.1.1.36.1]'
+          key: gas.onu.rx
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.4.1.34592.1.3.4.1.1.37.1.1; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.4.1.34592.1.3.4.1.1.36.1";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      var isHex = (rest.indexOf("Hex-STRING") === 0);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var p = oid.substring(base.length + 1).split(".");
+                      if (p.length < 2) { continue; }
+                      var pon = p[p.length - 2];
+                      var onu = p[p.length - 1];
+                      var idx = pon + "_" + onu;
                       out.push({idx: idx, val: v});
                   }
                   return JSON.stringify(out);
@@ -159,7 +258,7 @@ zabbix_export:
         - uuid: 54490b6496064b6fab02bf8957db94e0
           name: 'ONU status (walk)'
           type: SNMP_AGENT
-          snmp_oid: 'walk[.1.3.6.1.4.1.34592.1.3.4.1.1.11.1.1]'
+          snmp_oid: 'walk[.1.3.6.1.4.1.34592.1.3.4.1.1.11.1]'
           key: gas.onu.state
           value_type: TEXT
           description: 'SNMP walk .1.3.6.1.4.1.34592.1.3.4.1.1.11.1.1; JSON normalised for LLD recursion.'
@@ -167,7 +266,7 @@ zabbix_export:
             - type: JAVASCRIPT
               parameters:
                 - |
-                  var base = ".1.3.6.1.4.1.34592.1.3.4.1.1.11.1.1";
+                  var base = ".1.3.6.1.4.1.34592.1.3.4.1.1.11.1";
                   var lines = value.split("\n");
                   var out = [];
                   for (var i = 0; i < lines.length; i++) {
@@ -178,28 +277,32 @@ zabbix_export:
                       var rest = line.substring(eq + 3);
                       var c = rest.indexOf(": ");
                       var v = (c < 0) ? rest : rest.substring(c + 2);
+                      var isHex = (rest.indexOf("Hex-STRING") === 0);
                       if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
-                      var idx = oid.substring(base.length + 1);
-                      var d = idx.indexOf(".");
-                      if (d > 0) { idx = idx.substring(0, d); }
+                      var p = oid.substring(base.length + 1).split(".");
+                      if (p.length < 2) { continue; }
+                      var pon = p[p.length - 2];
+                      var onu = p[p.length - 1];
+                      var idx = pon + "_" + onu;
                       out.push({idx: idx, val: v});
                   }
                   return JSON.stringify(out);
           tags:
             - tag: scope
               value: onu
-        - uuid: b34dc2ce24f343ac8dc84efe92f58339
-          name: 'ONU status 2 (walk)'
+        - uuid: be0777a361ca402e90c1a797026c6118
+          name: 'ONU temperature raw (walk)'
           type: SNMP_AGENT
-          snmp_oid: 'walk[.1.3.6.1.4.1.34592.1.3.4.1.1.11.1.2]'
-          key: gas.onu.state2
+          snmp_oid: 'walk[.1.3.6.1.4.1.34592.1.3.4.1.1.40.1]'
+          key: gas.onu.temp
+          delay: 5m
           value_type: TEXT
-          description: 'SNMP walk .1.3.6.1.4.1.34592.1.3.4.1.1.11.1.2; JSON normalised for LLD recursion.'
+          description: 'SNMP walk .1.3.6.1.4.1.34592.1.3.4.1.1.40.1; JSON [{idx,val}] keyed as <PON>_<ONU> for LLD recursion.'
           preprocessing:
             - type: JAVASCRIPT
               parameters:
                 - |
-                  var base = ".1.3.6.1.4.1.34592.1.3.4.1.1.11.1.2";
+                  var base = ".1.3.6.1.4.1.34592.1.3.4.1.1.40.1";
                   var lines = value.split("\n");
                   var out = [];
                   for (var i = 0; i < lines.length; i++) {
@@ -210,10 +313,13 @@ zabbix_export:
                       var rest = line.substring(eq + 3);
                       var c = rest.indexOf(": ");
                       var v = (c < 0) ? rest : rest.substring(c + 2);
+                      var isHex = (rest.indexOf("Hex-STRING") === 0);
                       if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
-                      var idx = oid.substring(base.length + 1);
-                      var d = idx.indexOf(".");
-                      if (d > 0) { idx = idx.substring(0, d); }
+                      var p = oid.substring(base.length + 1).split(".");
+                      if (p.length < 2) { continue; }
+                      var pon = p[p.length - 2];
+                      var onu = p[p.length - 1];
+                      var idx = pon + "_" + onu;
                       out.push({idx: idx, val: v});
                   }
                   return JSON.stringify(out);
@@ -223,7 +329,7 @@ zabbix_export:
         - uuid: 633fb9abbd0841428b40c228d0bdd1f3
           name: 'ONU Tx (walk)'
           type: SNMP_AGENT
-          snmp_oid: 'walk[.1.3.6.1.4.1.34592.1.3.4.1.1.36.1.1]'
+          snmp_oid: 'walk[.1.3.6.1.4.1.34592.1.3.4.1.1.37.1]'
           key: gas.onu.tx
           value_type: TEXT
           description: 'SNMP walk .1.3.6.1.4.1.34592.1.3.4.1.1.36.1.1; JSON normalised for LLD recursion.'
@@ -231,7 +337,7 @@ zabbix_export:
             - type: JAVASCRIPT
               parameters:
                 - |
-                  var base = ".1.3.6.1.4.1.34592.1.3.4.1.1.36.1.1";
+                  var base = ".1.3.6.1.4.1.34592.1.3.4.1.1.37.1";
                   var lines = value.split("\n");
                   var out = [];
                   for (var i = 0; i < lines.length; i++) {
@@ -242,10 +348,49 @@ zabbix_export:
                       var rest = line.substring(eq + 3);
                       var c = rest.indexOf(": ");
                       var v = (c < 0) ? rest : rest.substring(c + 2);
+                      var isHex = (rest.indexOf("Hex-STRING") === 0);
                       if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
-                      var idx = oid.substring(base.length + 1);
-                      var d = idx.indexOf(".");
-                      if (d > 0) { idx = idx.substring(0, d); }
+                      var p = oid.substring(base.length + 1).split(".");
+                      if (p.length < 2) { continue; }
+                      var pon = p[p.length - 2];
+                      var onu = p[p.length - 1];
+                      var idx = pon + "_" + onu;
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+          tags:
+            - tag: scope
+              value: onu
+        - uuid: 4685b43164d8453d884b55e4e5fdda74
+          name: 'ONU voltage raw (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.4.1.34592.1.3.4.1.1.38.1]'
+          key: gas.onu.volt
+          delay: 5m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.4.1.34592.1.3.4.1.1.38.1; JSON [{idx,val}] keyed as <PON>_<ONU> for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.4.1.34592.1.3.4.1.1.38.1";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      var isHex = (rest.indexOf("Hex-STRING") === 0);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var p = oid.substring(base.length + 1).split(".");
+                      if (p.length < 2) { continue; }
+                      var pon = p[p.length - 2];
+                      var onu = p[p.length - 1];
+                      var idx = pon + "_" + onu;
                       out.push({idx: idx, val: v});
                   }
                   return JSON.stringify(out);
@@ -617,8 +762,80 @@ zabbix_export:
           lifetime: 14d
           description: 'ONUs discovered from the MAC table (.1.3.6.1.4.1.34592.1.3.4.1.1.7.1.1)'
           item_prototypes:
+            - uuid: 49422435566c4751a95806460c30b754
+              name: 'ONU [PON {#PON}/{#ONU}] {#SNMPVALUE} Bias current'
+              type: DEPENDENT
+              key: 'gas.onu.bias[{#SNMPINDEX}]'
+              value_type: FLOAT
+              units: mA
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+(\.[0-9]+)?$'
+                  error_handler: DISCARD_VALUE
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var v = parseFloat(value);
+                      if (!isFinite(v) || v <= 0) { return ""; }
+                      return v / 500;
+                - type: IN_RANGE
+                  parameters:
+                    - '0'
+                    - '100'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: gas.onu.bias
+              tags:
+                - tag: component
+                  value: gateray
+                - tag: onu
+                  value: '{#ONU}'
+                - tag: pon
+                  value: '{#PON}'
+                - tag: scope
+                  value: onu
+            - uuid: 0fa5b0613c9a44578ef937951a286b05
+              name: 'ONU [PON {#PON}/{#ONU}] {#SNMPVALUE} Distance'
+              type: DEPENDENT
+              key: 'gas.onu.dist[{#SNMPINDEX}]'
+              units: m
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+$'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: gas.onu.dist
+              tags:
+                - tag: component
+                  value: gateray
+                - tag: onu
+                  value: '{#ONU}'
+                - tag: pon
+                  value: '{#PON}'
+                - tag: scope
+                  value: onu
             - uuid: 1d7b8606bc284f25b2b3f5c827bdae0a
-              name: 'ONU [{#SNMPVALUE}] Name'
+              name: 'ONU [PON {#PON}/{#ONU}] {#SNMPVALUE} Description'
               type: DEPENDENT
               key: 'gas.onu.name[{#SNMPINDEX}]'
               value_type: TEXT
@@ -637,6 +854,10 @@ zabbix_export:
               tags:
                 - tag: component
                   value: gateray
+                - tag: onu
+                  value: '{#ONU}'
+                - tag: pon
+                  value: '{#PON}'
                 - tag: scope
                   value: onu
             - uuid: 90ee47339fb7430b911fb8c5be627260
@@ -658,6 +879,10 @@ zabbix_export:
               tags:
                 - tag: component
                   value: gateray
+                - tag: onu
+                  value: '{#ONU}'
+                - tag: pon
+                  value: '{#PON}'
                 - tag: scope
                   value: onu
             - uuid: 12818ff87ff74d228256efd9f49afce1
@@ -679,10 +904,14 @@ zabbix_export:
               tags:
                 - tag: component
                   value: gateray
+                - tag: onu
+                  value: '{#ONU}'
+                - tag: pon
+                  value: '{#PON}'
                 - tag: scope
                   value: onu
             - uuid: 5740db281d9c4e968dde9d1487cbde7a
-              name: 'ONU [{#SNMPVALUE}] Rx power'
+              name: 'ONU [PON {#PON}/{#ONU}] {#SNMPVALUE} Rx power'
               type: DEPENDENT
               key: 'gas.onu.rx[{#SNMPINDEX}]'
               value_type: FLOAT
@@ -705,47 +934,42 @@ zabbix_export:
                   parameters:
                     - |
                       var v = parseFloat(value);
-                      if (!isFinite(v) || v <= 0) { return ""; }
-                      return v * {$GATERAY.ONU.RX.SCALE} + {$GATERAY.ONU.RX.OFFSET};
+                      if (!isFinite(v) || v <= 0 || v > 60000) { return ""; }
+                      return 10 * Math.log(v / 10000) / Math.LN10;
                 - type: IN_RANGE
                   parameters:
-                    - '-60'
-                    - '10'
+                    - '-50'
+                    - '12'
                   error_handler: DISCARD_VALUE
               master_item:
                 key: gas.onu.rx
               tags:
                 - tag: component
                   value: gateray
+                - tag: onu
+                  value: '{#ONU}'
+                - tag: pon
+                  value: '{#PON}'
                 - tag: scope
                   value: onu
-            - uuid: ebce629f03374247b51f52991dd80240
-              name: 'ONU [{#SNMPVALUE}] Status 2'
-              type: DEPENDENT
-              key: 'gas.onu.state2[{#SNMPINDEX}]'
-              preprocessing:
-                - type: JAVASCRIPT
-                  parameters:
-                    - |
-                      var id = "{#SNMPINDEX}".replace(/^#/, "");
-                      var data = JSON.parse(value);
-                      for (var i = 0; i < data.length; i++) {
-                          if (data[i].idx === id) { return data[i].val; }
-                      }
-                      return "";
-                - type: MATCHES_REGEX
-                  parameters:
-                    - '^-?[0-9]+$'
-                  error_handler: DISCARD_VALUE
-              master_item:
-                key: gas.onu.state2
-              tags:
-                - tag: component
-                  value: gateray
-                - tag: scope
-                  value: onu
+              trigger_prototypes:
+                - uuid: 46098135f6d34513b0124ccedcd3b1a8
+                  expression: 'last(/Gateray_GR-EP-OLT_EPON_OLT/gas.onu.rx[{#SNMPINDEX}]) < {$GATERAY.ONU.RX.MIN}'
+                  recovery_mode: RECOVERY_EXPRESSION
+                  recovery_expression: 'last(/Gateray_GR-EP-OLT_EPON_OLT/gas.onu.rx[{#SNMPINDEX}]) >= {$GATERAY.ONU.RX.MIN}'
+                  name: 'ONU [{#SNMPVALUE}] Rx power low'
+                  priority: WARNING
+                  tags:
+                    - tag: component
+                      value: gateray
+                    - tag: onu
+                      value: '{#ONU}'
+                    - tag: pon
+                      value: '{#PON}'
+                    - tag: scope
+                      value: onu
             - uuid: 72a8174c3c4e400aa45003b9f4531de8
-              name: 'ONU [{#SNMPVALUE}] Status (2=Offline, 3=Online)'
+              name: 'ONU [PON {#PON}/{#ONU}] {#SNMPVALUE} Status (2=Offline, 3=Online)'
               type: DEPENDENT
               key: 'gas.onu.state[{#SNMPINDEX}]'
               preprocessing:
@@ -767,9 +991,28 @@ zabbix_export:
               tags:
                 - tag: component
                   value: gateray
+                - tag: onu
+                  value: '{#ONU}'
+                - tag: pon
+                  value: '{#PON}'
                 - tag: scope
                   value: onu
               trigger_prototypes:
+                - uuid: 208d1be3a97e4ff69d4883bd38badcec
+                  expression: 'last(/Gateray_GR-EP-OLT_EPON_OLT/gas.onu.state[{#SNMPINDEX}]) <> 3'
+                  recovery_mode: RECOVERY_EXPRESSION
+                  recovery_expression: 'last(/Gateray_GR-EP-OLT_EPON_OLT/gas.onu.state[{#SNMPINDEX}]) = 3'
+                  name: 'ONU [{#SNMPVALUE}] (PON {#PON}/{#ONU}) offline'
+                  priority: AVERAGE
+                  tags:
+                    - tag: component
+                      value: gateray
+                    - tag: onu
+                      value: '{#ONU}'
+                    - tag: pon
+                      value: '{#PON}'
+                    - tag: scope
+                      value: onu
                 - uuid: bbdb8010ac0247dc9c769e1294cfab50
                   expression: 'last(/Gateray_GR-EP-OLT_EPON_OLT/gas.onu.state[{#SNMPINDEX}]) = 2'
                   recovery_mode: RECOVERY_EXPRESSION
@@ -781,8 +1024,66 @@ zabbix_export:
                       value: gateray
                     - tag: scope
                       value: onu
+            - uuid: e83198a57ed849809000b618fb5c260c
+              name: 'ONU [PON {#PON}/{#ONU}] {#SNMPVALUE} Temperature'
+              type: DEPENDENT
+              key: 'gas.onu.temp[{#SNMPINDEX}]'
+              value_type: FLOAT
+              units: C
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+(\.[0-9]+)?$'
+                  error_handler: DISCARD_VALUE
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var v = parseFloat(value);
+                      if (!isFinite(v) || v <= 0) { return ""; }
+                      return v / 256;
+                - type: IN_RANGE
+                  parameters:
+                    - '-40'
+                    - '120'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: gas.onu.temp
+              tags:
+                - tag: component
+                  value: gateray
+                - tag: onu
+                  value: '{#ONU}'
+                - tag: pon
+                  value: '{#PON}'
+                - tag: scope
+                  value: onu
+              trigger_prototypes:
+                - uuid: c877227b50c44f298d1b67264765012c
+                  expression: 'last(/Gateray_GR-EP-OLT_EPON_OLT/gas.onu.temp[{#SNMPINDEX}]) > {$GATERAY.ONU.TEMP.MAX}'
+                  recovery_mode: RECOVERY_EXPRESSION
+                  recovery_expression: 'last(/Gateray_GR-EP-OLT_EPON_OLT/gas.onu.temp[{#SNMPINDEX}]) <= {$GATERAY.ONU.TEMP.MAX}'
+                  name: 'ONU [{#SNMPVALUE}] temperature high'
+                  priority: WARNING
+                  tags:
+                    - tag: component
+                      value: gateray
+                    - tag: onu
+                      value: '{#ONU}'
+                    - tag: pon
+                      value: '{#PON}'
+                    - tag: scope
+                      value: onu
             - uuid: a12b2882a5944df8922428f6a354fc52
-              name: 'ONU [{#SNMPVALUE}] Tx power'
+              name: 'ONU [PON {#PON}/{#ONU}] {#SNMPVALUE} Tx power'
               type: DEPENDENT
               key: 'gas.onu.tx[{#SNMPINDEX}]'
               value_type: FLOAT
@@ -805,18 +1106,22 @@ zabbix_export:
                   parameters:
                     - |
                       var v = parseFloat(value);
-                      if (!isFinite(v) || v <= 0) { return ""; }
-                      return v * {$GATERAY.ONU.TX.SCALE};
+                      if (!isFinite(v) || v <= 0 || v > 60000) { return ""; }
+                      return 10 * Math.log(v / 10000) / Math.LN10;
                 - type: IN_RANGE
                   parameters:
-                    - '-60'
-                    - '10'
+                    - '-50'
+                    - '12'
                   error_handler: DISCARD_VALUE
               master_item:
                 key: gas.onu.tx
               tags:
                 - tag: component
                   value: gateray
+                - tag: onu
+                  value: '{#ONU}'
+                - tag: pon
+                  value: '{#PON}'
                 - tag: scope
                   value: onu
               trigger_prototypes:
@@ -831,6 +1136,48 @@ zabbix_export:
                       value: gateray
                     - tag: scope
                       value: onu
+            - uuid: 3c007d4e6e7a463eb734a972115f8a37
+              name: 'ONU [PON {#PON}/{#ONU}] {#SNMPVALUE} Voltage'
+              type: DEPENDENT
+              key: 'gas.onu.volt[{#SNMPINDEX}]'
+              value_type: FLOAT
+              units: V
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+(\.[0-9]+)?$'
+                  error_handler: DISCARD_VALUE
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var v = parseFloat(value);
+                      if (!isFinite(v) || v <= 0) { return ""; }
+                      return v / 10000;
+                - type: IN_RANGE
+                  parameters:
+                    - '0'
+                    - '5'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: gas.onu.volt
+              tags:
+                - tag: component
+                  value: gateray
+                - tag: onu
+                  value: '{#ONU}'
+                - tag: pon
+                  value: '{#PON}'
+                - tag: scope
+                  value: onu
           master_item:
             key: gas.onu.mac
         - uuid: e12ff7aa672e4d5b9081aa6cea56c038
@@ -1190,12 +1537,15 @@ zabbix_export:
           master_item:
             key: if.name
       macros:
-        - macro: '{$GATERAY.ONU.RX.OFFSET}'
-          value: '-30'
-          description: 'Rx power offset, dBm = raw*scale+offset'
-        - macro: '{$GATERAY.ONU.RX.SCALE}'
-          value: '0.001'
-          description: 'Rx power scale (raw -> dBm)'
-        - macro: '{$GATERAY.ONU.TX.SCALE}'
-          value: '0.01'
-          description: 'Tx power scale (raw -> dBm)'
+        - macro: '{$GATERAY.ONU.RX.MIN}'
+          value: '-27'
+          description: 'ONU Rx power low threshold, dBm'
+        - macro: '{$GATERAY.ONU.TEMP.MAX}'
+          value: '70'
+          description: 'ONU module temperature high threshold, C'
+        - macro: '{$GATERAY.ONU.TX.MAX}'
+          value: '5'
+          description: 'ONU Tx power high threshold, dBm'
+        - macro: '{$GATERAY.ONU.TX.MIN}'
+          value: '0.5'
+          description: 'ONU Tx power low threshold, dBm'
