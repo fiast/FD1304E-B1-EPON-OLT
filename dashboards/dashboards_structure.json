@@ -1,6 +1,6 @@
 [
   {
-    "dashboardid": "404",
+    "dashboardid": "407",
     "name": "OLT olt_len204 — Абонент (метрики одного абонента)",
     "userid": "1",
     "private": "0",
@@ -9,12 +9,12 @@
     "uuid": "",
     "pages": [
       {
-        "dashboard_pageid": "16734",
+        "dashboard_pageid": "16737",
         "name": "Абонент",
         "display_period": "0",
         "widgets": [
           {
-            "widgetid": "60397",
+            "widgetid": "60409",
             "type": "itemnavigator",
             "name": "Метрики абонента: в фильтре тегов укажите subscriber = <имя абонента>",
             "x": "0",
@@ -66,7 +66,7 @@
             ]
           },
           {
-            "widgetid": "60398",
+            "widgetid": "60410",
             "type": "problems",
             "name": "Проблемы абонентов (клик по тегу = один абонент)",
             "x": "44",
@@ -123,7 +123,7 @@
             ]
           },
           {
-            "widgetid": "60399",
+            "widgetid": "60411",
             "type": "graphprototype",
             "name": "Сигнал ONU (Rx/Tx, dBm) — по одному графику на абонента",
             "x": "0",
@@ -174,7 +174,7 @@
     ]
   },
   {
-    "dashboardid": "405",
+    "dashboardid": "408",
     "name": "OLT olt_len204 — Абонентские интерфейсы (EPON)",
     "userid": "1",
     "private": "0",
@@ -183,12 +183,12 @@
     "uuid": "",
     "pages": [
       {
-        "dashboard_pageid": "16735",
+        "dashboard_pageid": "16738",
         "name": "Абонентские интерфейсы",
         "display_period": "0",
         "widgets": [
           {
-            "widgetid": "60400",
+            "widgetid": "60412",
             "type": "itemnavigator",
             "name": "EPON порты: статус, ошибки, скорость (в фильтре тегов: interface = <имя>)",
             "x": "0",
@@ -240,7 +240,7 @@
             ]
           },
           {
-            "widgetid": "60401",
+            "widgetid": "60413",
             "type": "problems",
             "name": "Проблемы портов (scope=port)",
             "x": "44",
@@ -297,7 +297,7 @@
             ]
           },
           {
-            "widgetid": "60402",
+            "widgetid": "60414",
             "type": "graphprototype",
             "name": "Трафик интерфейсов (bps)",
             "x": "0",
@@ -344,7 +344,7 @@
             ]
           },
           {
-            "widgetid": "60403",
+            "widgetid": "60415",
             "type": "graphprototype",
             "name": "Ошибки интерфейсов (пакеты)",
             "x": "0",
@@ -395,7 +395,7 @@
     ]
   },
   {
-    "dashboardid": "406",
+    "dashboardid": "409",
     "name": "OLT olt_len204 — Подключения ONU (абоненты)",
     "userid": "1",
     "private": "0",
@@ -404,12 +404,12 @@
     "uuid": "",
     "pages": [
       {
-        "dashboard_pageid": "16736",
+        "dashboard_pageid": "16739",
         "name": "Подключения ONU",
         "display_period": "0",
         "widgets": [
           {
-            "widgetid": "60404",
+            "widgetid": "60416",
             "type": "problems",
             "name": "Проблемы абонентских подключений (scope=onu)",
             "x": "0",
@@ -466,7 +466,7 @@
             ]
           },
           {
-            "widgetid": "60405",
+            "widgetid": "60417",
             "type": "itemnavigator",
             "name": "Подключения ONU: статус, сигналы, uptime (фильтр: subscriber = <имя>)",
             "x": "30",
@@ -518,7 +518,7 @@
             ]
           },
           {
-            "widgetid": "60406",
+            "widgetid": "60418",
             "type": "honeycomb",
             "name": "Доступность ONU (Online / Offline)",
             "x": "0",
@@ -635,7 +635,7 @@
             ]
           },
           {
-            "widgetid": "60407",
+            "widgetid": "60419",
             "type": "honeycomb",
             "name": "Карта Rx абонентов, dBm (красный < -26)",
             "x": "36",
@@ -762,7 +762,7 @@
             ]
           },
           {
-            "widgetid": "60408",
+            "widgetid": "60420",
             "type": "graphprototype",
             "name": "Сигнал ONU (Rx/Tx, dBm) по каждому абоненту",
             "x": "0",
@@ -805,6 +805,434 @@
                 "type": "1",
                 "name": "time_period.to",
                 "value": "now"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "dashboardid": "410",
+    "name": "OLT olt_len204 — Сводка по EPON-портам (ONU online/offline)",
+    "userid": "1",
+    "private": "0",
+    "display_period": "30",
+    "auto_start": "1",
+    "uuid": "",
+    "pages": [
+      {
+        "dashboard_pageid": "16740",
+        "name": "Сводка по EPON-портам",
+        "display_period": "0",
+        "widgets": [
+          {
+            "widgetid": "60421",
+            "type": "itemnavigator",
+            "name": "Сводка по EPON-портам: ONUs online / offline",
+            "x": "0",
+            "y": "0",
+            "width": "72",
+            "height": "10",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "3",
+                "name": "hostids.0",
+                "value": "10706"
+              },
+              {
+                "type": "1",
+                "name": "items.0",
+                "value": "EPON port [*"
+              },
+              {
+                "type": "1",
+                "name": "item_tags.0.tag",
+                "value": "scope"
+              },
+              {
+                "type": "0",
+                "name": "item_tags.0.operator",
+                "value": "1"
+              },
+              {
+                "type": "1",
+                "name": "item_tags.0.value",
+                "value": "port"
+              },
+              {
+                "type": "0",
+                "name": "state",
+                "value": "0"
+              },
+              {
+                "type": "0",
+                "name": "problems",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "show_lines",
+                "value": "100"
+              }
+            ]
+          },
+          {
+            "widgetid": "60422",
+            "type": "honeycomb",
+            "name": "ONU online по EPON-портам",
+            "x": "0",
+            "y": "10",
+            "width": "36",
+            "height": "10",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "3",
+                "name": "hostids.0",
+                "value": "10706"
+              },
+              {
+                "type": "1",
+                "name": "items.0",
+                "value": "EPON port [*] ONUs online"
+              },
+              {
+                "type": "1",
+                "name": "item_tags.0.tag",
+                "value": "scope"
+              },
+              {
+                "type": "0",
+                "name": "item_tags.0.operator",
+                "value": "1"
+              },
+              {
+                "type": "1",
+                "name": "item_tags.0.value",
+                "value": "port"
+              },
+              {
+                "type": "0",
+                "name": "show.0",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "show.1",
+                "value": "2"
+              },
+              {
+                "type": "0",
+                "name": "primary_label_type",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "primary_label",
+                "value": "{ITEM.NAME}"
+              },
+              {
+                "type": "0",
+                "name": "primary_label_decimal_places",
+                "value": "0"
+              },
+              {
+                "type": "0",
+                "name": "primary_label_size_type",
+                "value": "0"
+              },
+              {
+                "type": "0",
+                "name": "primary_label_size",
+                "value": "20"
+              },
+              {
+                "type": "0",
+                "name": "secondary_label_type",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "secondary_label_size_type",
+                "value": "0"
+              },
+              {
+                "type": "0",
+                "name": "secondary_label_size",
+                "value": "30"
+              },
+              {
+                "type": "0",
+                "name": "secondary_label_decimal_places",
+                "value": "2"
+              },
+              {
+                "type": "0",
+                "name": "maintenance",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.0.color",
+                "value": "E65660"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.0.threshold",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.1.color",
+                "value": "4CAF50"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.1.threshold",
+                "value": "1"
+              }
+            ]
+          },
+          {
+            "widgetid": "60423",
+            "type": "honeycomb",
+            "name": "ONU offline по EPON-портам",
+            "x": "36",
+            "y": "10",
+            "width": "36",
+            "height": "10",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "3",
+                "name": "hostids.0",
+                "value": "10706"
+              },
+              {
+                "type": "1",
+                "name": "items.0",
+                "value": "EPON port [*] ONUs offline"
+              },
+              {
+                "type": "1",
+                "name": "item_tags.0.tag",
+                "value": "scope"
+              },
+              {
+                "type": "0",
+                "name": "item_tags.0.operator",
+                "value": "1"
+              },
+              {
+                "type": "1",
+                "name": "item_tags.0.value",
+                "value": "port"
+              },
+              {
+                "type": "0",
+                "name": "show.0",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "show.1",
+                "value": "2"
+              },
+              {
+                "type": "0",
+                "name": "primary_label_type",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "primary_label",
+                "value": "{ITEM.NAME}"
+              },
+              {
+                "type": "0",
+                "name": "primary_label_decimal_places",
+                "value": "0"
+              },
+              {
+                "type": "0",
+                "name": "primary_label_size_type",
+                "value": "0"
+              },
+              {
+                "type": "0",
+                "name": "primary_label_size",
+                "value": "20"
+              },
+              {
+                "type": "0",
+                "name": "secondary_label_type",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "secondary_label_size_type",
+                "value": "0"
+              },
+              {
+                "type": "0",
+                "name": "secondary_label_size",
+                "value": "30"
+              },
+              {
+                "type": "0",
+                "name": "secondary_label_decimal_places",
+                "value": "2"
+              },
+              {
+                "type": "0",
+                "name": "maintenance",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.0.color",
+                "value": "4CAF50"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.0.threshold",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.1.color",
+                "value": "E65660"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.1.threshold",
+                "value": "1"
+              }
+            ]
+          },
+          {
+            "widgetid": "60424",
+            "type": "svggraph",
+            "name": "ONU online/offline по EPON-портам (динамика)",
+            "x": "0",
+            "y": "20",
+            "width": "72",
+            "height": "12",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "1",
+                "name": "ds.0.hosts.0",
+                "value": "olt_len204"
+              },
+              {
+                "type": "1",
+                "name": "ds.0.items.0",
+                "value": "EPON port [*] ONUs online"
+              },
+              {
+                "type": "1",
+                "name": "ds.0.color",
+                "value": "4CAF50"
+              },
+              {
+                "type": "1",
+                "name": "ds.1.hosts.0",
+                "value": "olt_len204"
+              },
+              {
+                "type": "1",
+                "name": "ds.1.items.0",
+                "value": "EPON port [*] ONUs offline"
+              },
+              {
+                "type": "1",
+                "name": "ds.1.color",
+                "value": "E65660"
+              },
+              {
+                "type": "0",
+                "name": "legend_statistic",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "legend_lines",
+                "value": "2"
+              },
+              {
+                "type": "0",
+                "name": "righty",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "time_period.from",
+                "value": "now-24h"
+              },
+              {
+                "type": "1",
+                "name": "time_period.to",
+                "value": "now"
+              }
+            ]
+          },
+          {
+            "widgetid": "60425",
+            "type": "problems",
+            "name": "Проблемы портов (scope=port)",
+            "x": "0",
+            "y": "32",
+            "width": "72",
+            "height": "8",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "3",
+                "name": "hostids.0",
+                "value": "10706"
+              },
+              {
+                "type": "1",
+                "name": "tags.0.tag",
+                "value": "scope"
+              },
+              {
+                "type": "0",
+                "name": "tags.0.operator",
+                "value": "1"
+              },
+              {
+                "type": "1",
+                "name": "tags.0.value",
+                "value": "port"
+              },
+              {
+                "type": "0",
+                "name": "evaltype",
+                "value": "0"
+              },
+              {
+                "type": "0",
+                "name": "show_tags",
+                "value": "3"
+              },
+              {
+                "type": "0",
+                "name": "show_suppressed",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "sort_triggers",
+                "value": "3"
+              },
+              {
+                "type": "0",
+                "name": "show_lines",
+                "value": "25"
               }
             ]
           }

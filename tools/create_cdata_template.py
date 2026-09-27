@@ -41,6 +41,9 @@ TPL_DESC = """C-Data FD1304E-B1 - EPON OLT monitoring via SNMP (BDCOM/C-Data ent
 LLD (low-level discovery) over SNMP walk:
   * ONU discovery  - subscriber name/state (online/offline), optical parameters:
                      Rx/Tx power (dBm), voltage (V), temperature (C), bias current (mA), uptime
+                     + online/offline flag items used for per-port aggregation
+  * EPON port LLD  - per-EPON-port ONU summary: "ONUs online" / "ONUs offline"
+                     (calculated: sum(last_foreach(//cdata.onu.online[*]?[tag="onu_port:<port>"])))
   * Interface LLD  - admin/oper status, speed, in/out octets, in/out traffic (bps), in/out errors
 
 Implementation notes:
@@ -55,8 +58,10 @@ Tuning macros: {$CDATA.ONU.RX_MIN} (-26), {$CDATA.ONU.RX_OK} (-24), {$CDATA.ONU.
                {$CDATA.IF.ERRORS_WARN} (1).
 
 Tags (use them to look at one subscriber/interface only):
-  * ONU items/triggers:      scope=onu, component=olt, subscriber=<ONU name>, onu_id=<ONU id>
+  * ONU items/triggers:      scope=onu, component=olt, subscriber=<ONU name>, onu_id=<ONU id>,
+                             onu_port=<EPON port, e.g. "epon 0/1/1">
   * Interface items/triggers: scope=port, component=olt, interface=<ifName>, ifindex=<ifIndex>
+  * EPON port summary items:  scope=port, component=olt, interface=<ifName>, ifindex=<ifIndex>
   In Monitoring -> Latest data / Problems click a tag value to filter by this subscriber.
 
 Graph prototypes (for the built-in "Graph prototype" dashboard widget):
@@ -69,6 +74,10 @@ Dashboards are created by create_dashboards.py:
   * "OLT <host> - Абонентские интерфейсы (EPON)"
   * "OLT <host> - Подключения ONU (абоненты)" - honeycomb availability + Rx heat map,
     ONU table, problems and per-ONU signal graphs
+  * "OLT <host> - Сводка по EPON-портам (ONU online/offline)" - per-port ONU counters
+Per-ONU dashboards (one dashboard per subscriber, titled with the ONU name) are created by
+sync_onu_dashboards.py - Zabbix has no dashboard prototypes, so this script plays that role
+(run it from cron after discovery).
 
 Note: the "[<if>] port is down" trigger fires for every interface with ifAdminStatus=up and
 ifOperStatus=down, including spare (unconnected) ports. Disable it if it is too noisy.
@@ -96,8 +105,12 @@ def pp(t, params, eh="0", ehp=""):
     return {"type": str(t), "params": params, "error_handler": str(eh), "error_handler_params": ehp}
 
 
-def js_normalize(base_oid, magic=False):
-    """JS preprocessing turning 'walk[]' text output into a JSON array."""
+def js_normalize(base_oid, magic=False, port_key=None):
+    """JS preprocessing turning 'walk[]' text output into a JSON array.
+
+    port_key: when set (magic mode), adds an extra LLD macro key with the EPON port
+              parsed from the value, e.g. "epon 0/1/1" (used for per-port ONU counting).
+    """
     idx_assign = "var idx = oid.substring(base.length + 1);\n    var d = idx.indexOf('.');\n    if (d > 0) { idx = idx.substring(0, d); }"
     head = 'var base = "%s";\n' % base_oid
     tail = ('    var v = (c < 0) ? rest : rest.substring(c + 2);\n'
@@ -115,12 +128,20 @@ def js_normalize(base_oid, magic=False):
     if magic:
         keys = ('var ki = "{" + "#SNMPINDEX}";\n'
                 'var kv = "{" + "#SNMPVALUE}";\n')
-        push = '    var o = {}; o[ki] = idx; o[kv] = v; out.push(o);\n'
+        if port_key:
+            keys += 'var kp = "{" + "#%s}";\n' % port_key
+            push = ('    var o = {}; o[ki] = idx; o[kv] = v;\n'
+                    '    var m = v.match(/^(epon\\s+\\S+)/);\n'
+                    '    o[kp] = m ? m[1] : v;\n'
+                    '    out.push(o);\n')
+        else:
+            push = '    var o = {}; o[ki] = idx; o[kv] = v; out.push(o);\n'
     else:
         keys = ''
         push = '    out.push({idx: idx, val: v});\n'
     return (head + keys + loop + tail + '    ' + idx_assign + '\n' + push +
             '}\nreturn JSON.stringify(out);')
+
 
 def js_extract():
     """JS preprocessing: pick this entity's value out of the master walk JSON.
@@ -149,10 +170,15 @@ def get_or_create_template():
     return r["templateids"][0], True
 
 
-def item_get_or_create(tid, spec):
+def item_get_or_create(tid, spec, update_preproc=False):
     found = api("item.get", {"output": ["itemid"], "templateids": tid,
                              "filter": {"key_": spec["key_"]}})
     if found:
+        if update_preproc and spec.get("preprocessing"):
+            upd = {"itemid": found[0]["itemid"], "preprocessing": spec["preprocessing"]}
+            if spec.get("description"):
+                upd["description"] = spec["description"]
+            api("item.update", upd)
         return found[0]["itemid"], False
     spec = dict(spec, hostid=tid)
     return api("item.create", spec)["itemids"][0], True
@@ -171,8 +197,12 @@ def proto_get_or_create(lldid, spec):
     found = api("itemprototype.get", {"output": ["itemid"], "discoveryids": lldid,
                                       "filter": {"key_": spec["key_"]}})
     if found:
-        if spec.get("tags"):
-            api("itemprototype.update", {"itemid": found[0]["itemid"], "tags": spec["tags"]})
+        upd = {"itemid": found[0]["itemid"]}
+        for k in ("tags", "preprocessing", "params", "master_itemid"):
+            if spec.get(k):
+                upd[k] = spec[k]
+        if len(upd) > 1:
+            api("itemprototype.update", upd)
         return found[0]["itemid"], False
     spec = dict(spec, ruleid=lldid, hostid=TPL_ID)
     return api("itemprototype.create", spec)["itemids"][0], True
@@ -276,11 +306,12 @@ def main():
         ("cdata.if.outoctets", "Interface output octets (walk)", f"{IF_BASE}.16", "plain", "2m"),
     ]
     for key, name, oid, mode, delay in walks:
+        port_key = "ONU_PORT" if key == "cdata.onu.name" else None
         s = {"name": name, "key_": key, "type": 20, "delay": delay,
              "snmp_oid": f"walk[{oid}]", "value_type": 4,
              "description": f"SNMP walk {oid}; JSON normalised for LLD recursion.",
-             "preprocessing": [pp(21, js_normalize(oid, magic=(mode == "magic")))]}
-        _, isnew = item_get_or_create(tid, s)
+             "preprocessing": [pp(21, js_normalize(oid, magic=(mode == "magic"), port_key=port_key))]}
+        _, isnew = item_get_or_create(tid, s, update_preproc=True)
         print(f"  {'+' if isnew else '='} {key}  walk[{oid}]")
 
     # ---------------- LLD: ONUs ----------------
@@ -297,7 +328,8 @@ def main():
     INT_RE = r"^-?[0-9]+$"
     NUM_RE = r"^-?[0-9]+(\.[0-9]+)?$"
     ONU_TAGS = [{"tag": "scope", "value": "onu"}, {"tag": "component", "value": "olt"},
-                {"tag": "subscriber", "value": "{#SNMPVALUE}"}, {"tag": "onu_id", "value": "{#SNMPINDEX}"}]
+                {"tag": "subscriber", "value": "{#SNMPVALUE}"}, {"tag": "onu_id", "value": "{#SNMPINDEX}"},
+                {"tag": "onu_port", "value": "{#ONU_PORT}"}]
     IF_TAGS = [{"tag": "scope", "value": "port"}, {"tag": "component", "value": "olt"},
                {"tag": "interface", "value": "{#SNMPVALUE}"}, {"tag": "ifindex", "value": "{#SNMPINDEX}"}]
 
@@ -322,6 +354,53 @@ def main():
     onu_proto("Temperature", "cdata.onu.temp[{#SNMPINDEX}]", "cdata.onu.temp", "C", 0, NUM_RE, [pp(1, "0.0001")])
     onu_proto("Bias current", "cdata.onu.bias[{#SNMPINDEX}]", "cdata.onu.bias", "mA", 0, NUM_RE, [pp(1, "0.001")])
     onu_proto("Uptime", "cdata.onu.uptime[{#SNMPINDEX}]", "cdata.onu.uptime", "uptime", 3)
+
+    # flags used for per-EPON-port ONU counting (aggregate over //cdata.onu.online[*])
+    def onu_flag(label, key, want):
+        master = api("item.get", {"output": ["itemid"], "templateids": tid,
+                                  "filter": {"key_": "cdata.onu.state"}})[0]["itemid"]
+        js = ('var id = "{#SNMPINDEX}".replace(/^#/, "");\n'
+              'var data = JSON.parse(value);\n'
+              'for (var i = 0; i < data.length; i++) {\n'
+              '    if (data[i].idx === id) { return (data[i].val === "%s") ? 1 : 0; }\n'
+              '}\n'
+              'return 0;' % want)
+        s = {"name": f"ONU [{{#SNMPVALUE}}] {label}", "key_": key, "type": 18, "delay": "0",
+             "master_itemid": master, "value_type": 3, "preprocessing": [pp(21, js)], "tags": ONU_TAGS}
+        _, isnew = proto_get_or_create(onu_lld, s)
+        print(f"  {'+' if isnew else '='} {key}")
+
+    onu_flag("Online flag", "cdata.onu.online[{#SNMPINDEX}]", "1")
+    onu_flag("Offline flag", "cdata.onu.offline[{#SNMPINDEX}]", "2")
+
+    # ---------------- LLD: EPON ports (ONU online/offline summary) ----------------
+    print("\n=== LLD rule: EPON ports ===")
+    epon_lld, _ = rule_get_or_create(tid, {
+        "name": "EPON port discovery", "key_": "cdata.epon.lld", "type": 18,
+        "master_itemid": api("item.get", {"output": ["itemid"], "templateids": tid,
+                                          "filter": {"key_": "cdata.if.name"}})[0]["itemid"],
+        "delay": "0", "lifetime": "7d",
+        "filter": {"evaltype": 0, "conditions": [
+            {"macro": "{#SNMPVALUE}", "value": "^epon", "operator": 8}]},
+        "description": "Subset of interfaces that are EPON ports; used for per-port ONU summary.",
+    })
+    print("  lld id:", epon_lld)
+
+    def epon_count(label, key, flag_key):
+        # per-port aggregate over all ONU flag items that carry tag onu_port=<port>
+        formula = ('sum(last_foreach(//%s[*]?[tag="onu_port:{#SNMPVALUE}"]))' % flag_key)
+        s = {"name": f"EPON port [{{#SNMPVALUE}}] {label}", "key_": key, "type": 15, "delay": "1m",
+             "params": formula, "value_type": 3,
+             "description": f"Calculated: {formula}",
+             "preprocessing": [pp(26, "-1", eh="2", ehp="0")],
+             "tags": [{"tag": "scope", "value": "port"}, {"tag": "component", "value": "olt"},
+                      {"tag": "interface", "value": "{#SNMPVALUE}"}, {"tag": "ifindex", "value": "{#SNMPINDEX}"}]}
+        _, isnew = proto_get_or_create(epon_lld, s)
+        print(f"  {'+' if isnew else '='} {key}")
+
+    epon_count("ONUs online", "cdata.epon.onu.online[{#SNMPINDEX}]", "cdata.onu.online")
+    epon_count("ONUs offline", "cdata.epon.onu.offline[{#SNMPINDEX}]", "cdata.onu.offline")
+
 
 
     # ---------------- LLD: interfaces ----------------

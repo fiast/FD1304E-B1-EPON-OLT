@@ -13,6 +13,9 @@ zabbix_export:
         LLD (low-level discovery) over SNMP walk:
           * ONU discovery  - subscriber name/state (online/offline), optical parameters:
                              Rx/Tx power (dBm), voltage (V), temperature (C), bias current (mA), uptime
+                             + online/offline flag items used for per-port aggregation
+          * EPON port LLD  - per-EPON-port ONU summary: "ONUs online" / "ONUs offline"
+                             (calculated: sum(last_foreach(//cdata.onu.online[*]?[tag="onu_port:<port>"])))
           * Interface LLD  - admin/oper status, speed, in/out octets, in/out traffic (bps), in/out errors
         
         Implementation notes:
@@ -27,8 +30,10 @@ zabbix_export:
                        {$CDATA.IF.ERRORS_WARN} (1).
         
         Tags (use them to look at one subscriber/interface only):
-          * ONU items/triggers:      scope=onu, component=olt, subscriber=<ONU name>, onu_id=<ONU id>
+          * ONU items/triggers:      scope=onu, component=olt, subscriber=<ONU name>, onu_id=<ONU id>,
+                                     onu_port=<EPON port, e.g. "epon 0/1/1">
           * Interface items/triggers: scope=port, component=olt, interface=<ifName>, ifindex=<ifIndex>
+          * EPON port summary items:  scope=port, component=olt, interface=<ifName>, ifindex=<ifIndex>
           In Monitoring -> Latest data / Problems click a tag value to filter by this subscriber.
         
         Graph prototypes (for the built-in "Graph prototype" dashboard widget):
@@ -41,6 +46,10 @@ zabbix_export:
           * "OLT <host> - Абонентские интерфейсы (EPON)"
           * "OLT <host> - Подключения ONU (абоненты)" - honeycomb availability + Rx heat map,
             ONU table, problems and per-ONU signal graphs
+          * "OLT <host> - Сводка по EPON-портам (ONU online/offline)" - per-port ONU counters
+        Per-ONU dashboards (one dashboard per subscriber, titled with the ONU name) are created by
+        sync_onu_dashboards.py - Zabbix has no dashboard prototypes, so this script plays that role
+        (run it from cron after discovery).
         
         Note: the "[<if>] port is down" trigger fires for every interface with ifAdminStatus=up and
         ifOperStatus=down, including spare (unconnected) ports. Disable it if it is too noisy.
@@ -334,6 +343,7 @@ zabbix_export:
                   var base = ".1.3.6.1.4.1.17409.2.3.4.1.1.2";
                   var ki = "{" + "#SNMPINDEX}";
                   var kv = "{" + "#SNMPVALUE}";
+                  var kp = "{" + "#ONU_PORT}";
                   var lines = value.split("\n");
                   var out = [];
                   for (var i = 0; i < lines.length; i++) {
@@ -348,7 +358,10 @@ zabbix_export:
                       var idx = oid.substring(base.length + 1);
                       var d = idx.indexOf('.');
                       if (d > 0) { idx = idx.substring(0, d); }
-                      var o = {}; o[ki] = idx; o[kv] = v; out.push(o);
+                      var o = {}; o[ki] = idx; o[kv] = v;
+                      var m = v.match(/^(epon\s+\S+)/);
+                      o[kp] = m ? m[1] : v;
+                      out.push(o);
                   }
                   return JSON.stringify(out);
         - uuid: 77e37ed514f84a5098703aebabdc4eab
@@ -577,6 +590,60 @@ zabbix_export:
           units: uptime
           description: 'SNMP OID .1.3.6.1.2.1.1.3.0'
       discovery_rules:
+        - uuid: 0c2ed455007044f0bbb820142621ad16
+          name: 'EPON port discovery'
+          type: DEPENDENT
+          key: cdata.epon.lld
+          filter:
+            conditions:
+              - macro: '{#SNMPVALUE}'
+                value: ^epon
+          description: 'Subset of interfaces that are EPON ports; used for per-port ONU summary.'
+          item_prototypes:
+            - uuid: 17a1c8e3c624409dad3762eb20c98e43
+              name: 'EPON port [{#SNMPVALUE}] ONUs offline'
+              type: CALCULATED
+              key: 'cdata.epon.onu.offline[{#SNMPINDEX}]'
+              params: 'sum(last_foreach(//cdata.onu.offline[*]?[tag="onu_port:{#SNMPVALUE}"]))'
+              description: 'Calculated: sum(last_foreach(//cdata.onu.offline[*]?[tag="onu_port:{#SNMPVALUE}"]))'
+              preprocessing:
+                - type: CHECK_NOT_SUPPORTED
+                  parameters:
+                    - '-1'
+                  error_handler: CUSTOM_VALUE
+                  error_handler_params: '0'
+              tags:
+                - tag: component
+                  value: olt
+                - tag: ifindex
+                  value: '{#SNMPINDEX}'
+                - tag: interface
+                  value: '{#SNMPVALUE}'
+                - tag: scope
+                  value: port
+            - uuid: 03bf4d22f23a424a99b1754bef42b4df
+              name: 'EPON port [{#SNMPVALUE}] ONUs online'
+              type: CALCULATED
+              key: 'cdata.epon.onu.online[{#SNMPINDEX}]'
+              params: 'sum(last_foreach(//cdata.onu.online[*]?[tag="onu_port:{#SNMPVALUE}"]))'
+              description: 'Calculated: sum(last_foreach(//cdata.onu.online[*]?[tag="onu_port:{#SNMPVALUE}"]))'
+              preprocessing:
+                - type: CHECK_NOT_SUPPORTED
+                  parameters:
+                    - '-1'
+                  error_handler: CUSTOM_VALUE
+                  error_handler_params: '0'
+              tags:
+                - tag: component
+                  value: olt
+                - tag: ifindex
+                  value: '{#SNMPINDEX}'
+                - tag: interface
+                  value: '{#SNMPVALUE}'
+                - tag: scope
+                  value: port
+          master_item:
+            key: cdata.if.name
         - uuid: a8ed4931a04d4b278ccbd7e1b9e2b429
           name: 'Interface discovery'
           type: DEPENDENT
@@ -974,6 +1041,62 @@ zabbix_export:
                   value: olt
                 - tag: onu_id
                   value: '{#SNMPINDEX}'
+                - tag: onu_port
+                  value: '{#ONU_PORT}'
+                - tag: scope
+                  value: onu
+                - tag: subscriber
+                  value: '{#SNMPVALUE}'
+            - uuid: 2c4a039e132e409ab9afaaca5eb1f77b
+              name: 'ONU [{#SNMPVALUE}] Offline flag'
+              type: DEPENDENT
+              key: 'cdata.onu.offline[{#SNMPINDEX}]'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return (data[i].val === "2") ? 1 : 0; }
+                      }
+                      return 0;
+              master_item:
+                key: cdata.onu.state
+              tags:
+                - tag: component
+                  value: olt
+                - tag: onu_id
+                  value: '{#SNMPINDEX}'
+                - tag: onu_port
+                  value: '{#ONU_PORT}'
+                - tag: scope
+                  value: onu
+                - tag: subscriber
+                  value: '{#SNMPVALUE}'
+            - uuid: 8f03ea6e94f345c7b26d4ca836db3fb4
+              name: 'ONU [{#SNMPVALUE}] Online flag'
+              type: DEPENDENT
+              key: 'cdata.onu.online[{#SNMPINDEX}]'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return (data[i].val === "1") ? 1 : 0; }
+                      }
+                      return 0;
+              master_item:
+                key: cdata.onu.state
+              tags:
+                - tag: component
+                  value: olt
+                - tag: onu_id
+                  value: '{#SNMPINDEX}'
+                - tag: onu_port
+                  value: '{#ONU_PORT}'
                 - tag: scope
                   value: onu
                 - tag: subscriber
@@ -1008,6 +1131,8 @@ zabbix_export:
                   value: olt
                 - tag: onu_id
                   value: '{#SNMPINDEX}'
+                - tag: onu_port
+                  value: '{#ONU_PORT}'
                 - tag: scope
                   value: onu
                 - tag: subscriber
@@ -1022,6 +1147,8 @@ zabbix_export:
                       value: olt
                     - tag: onu_id
                       value: '{#SNMPINDEX}'
+                    - tag: onu_port
+                      value: '{#ONU_PORT}'
                     - tag: scope
                       value: onu
                     - tag: subscriber
@@ -1037,6 +1164,8 @@ zabbix_export:
                       value: olt
                     - tag: onu_id
                       value: '{#SNMPINDEX}'
+                    - tag: onu_port
+                      value: '{#ONU_PORT}'
                     - tag: scope
                       value: onu
                     - tag: subscriber
@@ -1068,6 +1197,8 @@ zabbix_export:
                   value: olt
                 - tag: onu_id
                   value: '{#SNMPINDEX}'
+                - tag: onu_port
+                  value: '{#ONU_PORT}'
                 - tag: scope
                   value: onu
                 - tag: subscriber
@@ -1084,6 +1215,8 @@ zabbix_export:
                       value: olt
                     - tag: onu_id
                       value: '{#SNMPINDEX}'
+                    - tag: onu_port
+                      value: '{#ONU_PORT}'
                     - tag: scope
                       value: onu
                     - tag: subscriber
@@ -1118,6 +1251,8 @@ zabbix_export:
                   value: olt
                 - tag: onu_id
                   value: '{#SNMPINDEX}'
+                - tag: onu_port
+                  value: '{#ONU_PORT}'
                 - tag: scope
                   value: onu
                 - tag: subscriber
@@ -1134,6 +1269,8 @@ zabbix_export:
                       value: olt
                     - tag: onu_id
                       value: '{#SNMPINDEX}'
+                    - tag: onu_port
+                      value: '{#ONU_PORT}'
                     - tag: scope
                       value: onu
                     - tag: subscriber
@@ -1168,6 +1305,8 @@ zabbix_export:
                   value: olt
                 - tag: onu_id
                   value: '{#SNMPINDEX}'
+                - tag: onu_port
+                  value: '{#ONU_PORT}'
                 - tag: scope
                   value: onu
                 - tag: subscriber
@@ -1184,6 +1323,8 @@ zabbix_export:
                       value: olt
                     - tag: onu_id
                       value: '{#SNMPINDEX}'
+                    - tag: onu_port
+                      value: '{#ONU_PORT}'
                     - tag: scope
                       value: onu
                     - tag: subscriber
@@ -1214,6 +1355,8 @@ zabbix_export:
                   value: olt
                 - tag: onu_id
                   value: '{#SNMPINDEX}'
+                - tag: onu_port
+                  value: '{#ONU_PORT}'
                 - tag: scope
                   value: onu
                 - tag: subscriber
@@ -1248,6 +1391,8 @@ zabbix_export:
                   value: olt
                 - tag: onu_id
                   value: '{#SNMPINDEX}'
+                - tag: onu_port
+                  value: '{#ONU_PORT}'
                 - tag: scope
                   value: onu
                 - tag: subscriber

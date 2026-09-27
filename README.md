@@ -4,7 +4,7 @@
 `.1.3.6.1.4.1.17409`) по SNMP: автообнаружение абонентских ONU и интерфейсов, оптические
 параметры абонентов, теги для просмотра метрик одного абонента, готовые дашборды.
 
-* Версия шаблона: **1.0** (Zabbix **7.4.x**, экспорт `version: '7.4'`)
+* Версия шаблона: **1.1** (Zabbix **7.4.x**, экспорт `version: '7.4'`)
 * Протестировано на: C-Data FD1304E-B1, Zabbix 7.4.5
 
 ---
@@ -16,6 +16,12 @@
 * **Оптические параметры**: Rx power (dBm), Tx power (dBm), напряжение (V), температура (°C),
   ток смещения лазера (mA), uptime ONU
 * Оффлайн-ONU: оптические итемы остаются без данных (не становятся `unsupported`)
+* Флаговые итемы online/offline на каждого ONU (основа для подсчёта по портам)
+
+### Сводка по EPON-портам
+* Отдельное LLD-правило по EPON-портам и calculated-итемы
+  **`EPON port [<порт>] ONUs online`** / **`... Offline`** — сколько абонентов online/offline
+  на каждом порту (считается внутри Zabbix, вендор такого счётчика не отдаёт)
 
 ### Автообнаружение (LLD) интерфейсов
 * Admin / Oper status (с value map `up` / `down`)
@@ -37,8 +43,9 @@
 ### Теги (просмотр одного абонента / порта)
 | Объект | Теги |
 |---|---|
-| ONU items / triggers | `scope=onu`, `component=olt`, `subscriber=<имя ONU>`, `onu_id=<ONU id>` |
+| ONU items / triggers | `scope=onu`, `component=olt`, `subscriber=<имя ONU>`, `onu_id=<ONU id>`, `onu_port=<EPON порт>` |
 | Interface items / triggers | `scope=port`, `component=olt`, `interface=<имя порта>`, `ifindex=<ifIndex>` |
+| EPON port summary items | `scope=port`, `component=olt`, `interface=<имя порта>`, `ifindex=<ifIndex>` |
 
 В **Monitoring → Latest data** включите колонку *Tags* и кликните по значению `subscriber=...`
 (или `interface=...`) — увидите метрики только этого абонента/порта. В **Problems** клик по тегу
@@ -52,11 +59,28 @@
 Используются виджетом **Graph prototype** на дашбордах и доступны как обычные графики у итемов.
 
 ### Готовые дашборды
-Создаются скриптом [`dashboards/create_dashboards.py`](dashboards/create_dashboards.py):
+Статические дашборды создаются скриптом
+[`dashboards/create_dashboards.py`](dashboards/create_dashboards.py):
 * **Абонент** — метрики одного абонента (фильтр по тегу `subscriber`).
 * **Абонентские интерфейсы (EPON)** — статус/ошибки/скорость портов, графики трафика и ошибок.
 * **Подключения ONU** — сводка абонентских подключений: honeycomb-карта доступности
   Online/Offline, тепловая карта Rx, таблица подключений, графики сигналов.
+* **Сводка по EPON-портам** — сколько ONU **online/offline на каждый EPON-порт**
+  (таблица + honeycomb + график динамики).
+
+### Дашборд на каждого абонента (автоматически)
+Zabbix (7.4) **не имеет объекта «прототип дашборда»**, поэтому его роль выполняет скрипт
+[`dashboards/sync_onu_dashboards.py`](dashboards/sync_onu_dashboards.py): он запускается по cron
+и для каждого обнаруженного ONU создаёт/обновляет отдельный дашборд (название = адрес/имя ONU),
+содержащий:
+* **индикатор (gauge) Rx power** — последний уровень сигнала с цветовыми порогами;
+* **индикатор (gauge) Tx power** — последний уровень;
+* крупные значения: State, Temperature, Voltage, Bias current, Uptime;
+* график сигнала **Rx/Tx (dBm)**;
+* график мощности **Rx (dBm)** за 24 ч;
+* проблемы только этого абонента (тег `subscriber`).
+
+Пример структуры такого дашборда — [`dashboards/onu_dashboard_example.json`](dashboards/onu_dashboard_example.json).
 
 ---
 
@@ -102,7 +126,7 @@ export ZABBIX_TEMPLATEID="<template id>"
 export ZABBIX_DASH_PREFIX="OLT"
 python3 dashboards/create_dashboards.py
 ```
-Создаются три публичных дашборда:
+Создаются четыре публичных дашборда:
 * **`OLT <host> — Абонент (метрики одного абонента)`** — `Item navigator` со всеми метриками ONU
   (фильтр по тегу `subscriber`), `Problems` абонентов, сетка графиков Rx/Tx по каждому абоненту.
 * **`OLT <host> — Абонентские интерфейсы (EPON)`** — таблица EPON-портов (статус, ошибки,
@@ -115,9 +139,43 @@ python3 dashboards/create_dashboards.py
   * **honeycomb «Карта Rx абонентов»** — тепловая карта уровня сигнала по абонентам
     (зелёный ≥ −24 dBm, жёлтый от −25 dBm, красный < −26 dBm);
   * сетка графиков «Сигнал ONU (Rx/Tx, dBm)» по каждому абоненту.
+* **`OLT <host> — Сводка по EPON-портам (ONU online/offline)`** — сколько абонентов
+  online/offline на каждом EPON-порту: таблица, два honeycomb (online/offline) и график
+  динамики за 24 ч. Значения берутся из итемов
+  `EPON port [<порт>] ONUs online` / `... OFFline` (calculated item, см. ниже).
 
 > Honeycomb использует «плитку» на каждый найденный item (паттерн `ONU [*] ...` + тег
 > `scope=onu`), поэтому новые абоненты появляются на карте автоматически после LLD.
+
+### 5. (опционально) Дашборд на каждого абонента — автоматически
+
+Zabbix **не имеет «прототипа дашборда»** (такого объекта нет ни в API, ни в UI: проверить можно
+методом `dashboardprototype.get` — он вернёт «Method not found»). Роль прототипа выполняет скрипт
+[`dashboards/sync_onu_dashboards.py`](dashboards/sync_onu_dashboards.py):
+
+```bash
+export ZABBIX_URL="https://zabbix.example.com/api_jsonrpc.php"
+export ZABBIX_TOKEN="<API token>"
+export ZABBIX_HOSTID="<host id>"            # или ZABBIX_TEMPLATEID для всех хостов шаблона
+export ZABBIX_DASH_PREFIX="ONU"             # префикс имени дашборда
+
+python3 dashboards/sync_onu_dashboards.py --dry-run      # посмотреть план
+python3 dashboards/sync_onu_dashboards.py                # создать/обновить
+python3 dashboards/sync_onu_dashboards.py --prune        # + удалить дашборды исчезнувших ONU
+```
+
+Скрипт идемпотентен: структура дашборда хешируется (файл `~/.cache/onu_dashboards.json`), при
+отсутствии изменений обновление не выполняется. Пример cron (раз в 5 минут):
+
+```cron
+*/5 * * * * ZABBIX_URL="https://zabbix.example.com/api_jsonrpc.php" ZABBIX_TOKEN="<token>" \
+  ZABBIX_HOSTID="<host id>" /usr/bin/python3 /opt/zabbix-onu-dashboards/sync_onu_dashboards.py \
+  --prune >> /var/log/onu-dashboards.log 2>&1
+```
+
+Так «дашборд на каждого ONU» появляется сам после discovery и удаляется, когда ONU больше
+не обнаружен.
+
 
 ---
 
@@ -165,8 +223,24 @@ python3 dashboards/create_dashboards.py
    и JavaScript-предобработку, которая превращает «сырой» вывод snmpwalk в JSON-массив
    `[{"idx":"...","val":"..."}]`.
 2. **LLD-правила (dependent items)** навешены на master «имена»: ONU — `cdata.onu.name`,
-   интерфейсы — `cdata.if.name`.
+   интерфейсы — `cdata.if.name`. Для сводки по портам есть отдельное правило `cdata.epon.lld`
+   (тот же master, фильтр `{#SNMPVALUE}` по regex `^epon`).
 3. **Item prototypes (dependent)** извлекают своё значение из JSON мастера.
+
+### Подсчёт ONU online/offline по EPON-портам
+Вендор не отдаёт по SNMP счётчик ONU на порт (таблицы `.1.3.6.1.4.1.17409.2.3.3.*` содержат
+другие значения), поэтому счётчики считаются внутри Zabbix:
+
+1. Для каждого ONU создаются флаговые итемы `cdata.onu.online[{#SNMPINDEX}]` / `...offline[...]`
+   (1/0 по статусу ONU), и всем ONU-итемам добавляется тег `onu_port=<EPON порт>`.
+2. Для каждого EPON-порта создаётся calculated item
+   `EPON port [<порт>] ONUs online` с формулой (foreach-функции Zabbix 7.x):
+   ```
+   sum(last_foreach(//cdata.onu.online[*]?[tag="onu_port:epon 0/1/1"]))
+   ```
+   и аналогично `ONUs offline`.
+3. Пустые порты (нет ONU) не становятся `unsupported` благодаря шагу предобработки
+   **Check for not supported value** («Set value» = `0`).
 
 ### Почему извлечение сделано на JavaScript, а не JSONPath
 На Zabbix **7.4.5** LLD-макрос `{#SNMPINDEX}` внутри параметров предобработки подставляется
@@ -200,8 +274,10 @@ return "";
 
 ```
 zabbix/template_C-Data_FD1304E-B1_EPON_OLT.yaml   # импортируемый шаблон
-dashboards/create_dashboards.py                   # создание дашбордов через API
-dashboards/dashboards_structure.json              # дамп структуры дашбордов (reference)
+dashboards/create_dashboards.py                   # 4 статических дашборда через API
+dashboards/sync_onu_dashboards.py                 # «прототип дашборда»: дашборд на каждого ONU (cron)
+dashboards/dashboards_structure.json              # дамп структуры статических дашбордов
+dashboards/onu_dashboard_example.json             # пример сгенерированного дашборда абонента
 tools/create_cdata_template.py                    # полный «сборщик» шаблона через API
 tools/export_repo.py                              # экспорт шаблона / дамп дашбордов
 docs/OID_reference.md                             # карта OID

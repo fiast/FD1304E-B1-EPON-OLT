@@ -1,0 +1,735 @@
+[
+  {
+    "dashboardid": "411",
+    "name": "ONU epon 0/1/1 onu 1 lenina205-xleb",
+    "userid": "1",
+    "private": "0",
+    "display_period": "30",
+    "auto_start": "1",
+    "uuid": "",
+    "pages": [
+      {
+        "dashboard_pageid": "16741",
+        "name": "Абонент",
+        "display_period": "0",
+        "widgets": [
+          {
+            "widgetid": "60426",
+            "type": "gauge",
+            "name": "",
+            "x": "0",
+            "y": "0",
+            "width": "24",
+            "height": "9",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "4",
+                "name": "itemid.0",
+                "value": "99021"
+              },
+              {
+                "type": "0",
+                "name": "angle",
+                "value": "180"
+              },
+              {
+                "type": "0",
+                "name": "min",
+                "value": "-35"
+              },
+              {
+                "type": "0",
+                "name": "max",
+                "value": "0"
+              },
+              {
+                "type": "0",
+                "name": "show.0",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "show.1",
+                "value": "2"
+              },
+              {
+                "type": "0",
+                "name": "show.2",
+                "value": "4"
+              },
+              {
+                "type": "0",
+                "name": "show.3",
+                "value": "5"
+              },
+              {
+                "type": "1",
+                "name": "description",
+                "value": "Rx power, dBm"
+              },
+              {
+                "type": "0",
+                "name": "desc_size",
+                "value": "15"
+              },
+              {
+                "type": "0",
+                "name": "desc_bold",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "value_size",
+                "value": "35"
+              },
+              {
+                "type": "0",
+                "name": "units_show",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "decimal_places",
+                "value": "2"
+              },
+              {
+                "type": "0",
+                "name": "units_size",
+                "value": "20"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.0.color",
+                "value": "E65660"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.0.threshold",
+                "value": "-26"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.1.color",
+                "value": "FCCB1D"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.1.threshold",
+                "value": "-25"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.2.color",
+                "value": "4CAF50"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.2.threshold",
+                "value": "-24"
+              }
+            ]
+          },
+          {
+            "widgetid": "60427",
+            "type": "gauge",
+            "name": "",
+            "x": "24",
+            "y": "0",
+            "width": "24",
+            "height": "9",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "4",
+                "name": "itemid.0",
+                "value": "99033"
+              },
+              {
+                "type": "0",
+                "name": "angle",
+                "value": "180"
+              },
+              {
+                "type": "0",
+                "name": "min",
+                "value": "0"
+              },
+              {
+                "type": "0",
+                "name": "max",
+                "value": "5"
+              },
+              {
+                "type": "0",
+                "name": "show.0",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "show.1",
+                "value": "2"
+              },
+              {
+                "type": "0",
+                "name": "show.2",
+                "value": "4"
+              },
+              {
+                "type": "0",
+                "name": "show.3",
+                "value": "5"
+              },
+              {
+                "type": "1",
+                "name": "description",
+                "value": "Tx power, dBm"
+              },
+              {
+                "type": "0",
+                "name": "desc_size",
+                "value": "15"
+              },
+              {
+                "type": "0",
+                "name": "desc_bold",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "value_size",
+                "value": "35"
+              },
+              {
+                "type": "0",
+                "name": "units_show",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "decimal_places",
+                "value": "2"
+              },
+              {
+                "type": "0",
+                "name": "units_size",
+                "value": "20"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.0.color",
+                "value": "FCCB1D"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.0.threshold",
+                "value": "1"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.1.color",
+                "value": "4CAF50"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.1.threshold",
+                "value": "2"
+              }
+            ]
+          },
+          {
+            "widgetid": "60428",
+            "type": "item",
+            "name": "",
+            "x": "48",
+            "y": "0",
+            "width": "24",
+            "height": "9",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "4",
+                "name": "itemid.0",
+                "value": "99009"
+              },
+              {
+                "type": "0",
+                "name": "show.0",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "show.1",
+                "value": "2"
+              },
+              {
+                "type": "0",
+                "name": "show.2",
+                "value": "3"
+              },
+              {
+                "type": "0",
+                "name": "show.3",
+                "value": "4"
+              },
+              {
+                "type": "1",
+                "name": "description",
+                "value": "State (1=Online / 2=Offline)"
+              },
+              {
+                "type": "0",
+                "name": "desc_size",
+                "value": "20"
+              },
+              {
+                "type": "0",
+                "name": "desc_bold",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "value_size",
+                "value": "40"
+              },
+              {
+                "type": "0",
+                "name": "units_show",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "decimal_places",
+                "value": "2"
+              }
+            ]
+          },
+          {
+            "widgetid": "60429",
+            "type": "svggraph",
+            "name": "Сигнал ONU (Rx/Tx, dBm)",
+            "x": "0",
+            "y": "9",
+            "width": "72",
+            "height": "12",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "0",
+                "name": "legend_statistic",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "legend_lines",
+                "value": "2"
+              },
+              {
+                "type": "0",
+                "name": "righty",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "time_period.from",
+                "value": "now-6h"
+              },
+              {
+                "type": "1",
+                "name": "time_period.to",
+                "value": "now"
+              },
+              {
+                "type": "1",
+                "name": "ds.0.hosts.0",
+                "value": "olt_len204"
+              },
+              {
+                "type": "1",
+                "name": "ds.0.items.0",
+                "value": "ONU [epon 0/1/1 onu 1 lenina205-xleb] Rx power"
+              },
+              {
+                "type": "1",
+                "name": "ds.0.hosts.1",
+                "value": "olt_len204"
+              },
+              {
+                "type": "1",
+                "name": "ds.0.items.1",
+                "value": "ONU [epon 0/1/1 onu 1 lenina205-xleb] Tx power"
+              }
+            ]
+          },
+          {
+            "widgetid": "60430",
+            "type": "svggraph",
+            "name": "Мощность сигнала Rx, dBm",
+            "x": "0",
+            "y": "21",
+            "width": "72",
+            "height": "12",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "0",
+                "name": "legend_statistic",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "legend_lines",
+                "value": "2"
+              },
+              {
+                "type": "0",
+                "name": "righty",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "time_period.from",
+                "value": "now-24h"
+              },
+              {
+                "type": "1",
+                "name": "time_period.to",
+                "value": "now"
+              },
+              {
+                "type": "1",
+                "name": "ds.0.hosts.0",
+                "value": "olt_len204"
+              },
+              {
+                "type": "1",
+                "name": "ds.0.items.0",
+                "value": "ONU [epon 0/1/1 onu 1 lenina205-xleb] Rx power"
+              }
+            ]
+          },
+          {
+            "widgetid": "60431",
+            "type": "item",
+            "name": "",
+            "x": "0",
+            "y": "33",
+            "width": "18",
+            "height": "5",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "4",
+                "name": "itemid.0",
+                "value": "99057"
+              },
+              {
+                "type": "0",
+                "name": "show.0",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "show.1",
+                "value": "2"
+              },
+              {
+                "type": "0",
+                "name": "show.2",
+                "value": "3"
+              },
+              {
+                "type": "0",
+                "name": "show.3",
+                "value": "4"
+              },
+              {
+                "type": "1",
+                "name": "description",
+                "value": "Temperature, C"
+              },
+              {
+                "type": "0",
+                "name": "desc_size",
+                "value": "20"
+              },
+              {
+                "type": "0",
+                "name": "desc_bold",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "value_size",
+                "value": "40"
+              },
+              {
+                "type": "0",
+                "name": "units_show",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "decimal_places",
+                "value": "2"
+              }
+            ]
+          },
+          {
+            "widgetid": "60432",
+            "type": "item",
+            "name": "",
+            "x": "18",
+            "y": "33",
+            "width": "18",
+            "height": "5",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "4",
+                "name": "itemid.0",
+                "value": "99045"
+              },
+              {
+                "type": "0",
+                "name": "show.0",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "show.1",
+                "value": "2"
+              },
+              {
+                "type": "0",
+                "name": "show.2",
+                "value": "3"
+              },
+              {
+                "type": "0",
+                "name": "show.3",
+                "value": "4"
+              },
+              {
+                "type": "1",
+                "name": "description",
+                "value": "Voltage, V"
+              },
+              {
+                "type": "0",
+                "name": "desc_size",
+                "value": "20"
+              },
+              {
+                "type": "0",
+                "name": "desc_bold",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "value_size",
+                "value": "40"
+              },
+              {
+                "type": "0",
+                "name": "units_show",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "decimal_places",
+                "value": "2"
+              }
+            ]
+          },
+          {
+            "widgetid": "60433",
+            "type": "item",
+            "name": "",
+            "x": "36",
+            "y": "33",
+            "width": "18",
+            "height": "5",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "4",
+                "name": "itemid.0",
+                "value": "99069"
+              },
+              {
+                "type": "0",
+                "name": "show.0",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "show.1",
+                "value": "2"
+              },
+              {
+                "type": "0",
+                "name": "show.2",
+                "value": "3"
+              },
+              {
+                "type": "0",
+                "name": "show.3",
+                "value": "4"
+              },
+              {
+                "type": "1",
+                "name": "description",
+                "value": "Bias current, mA"
+              },
+              {
+                "type": "0",
+                "name": "desc_size",
+                "value": "20"
+              },
+              {
+                "type": "0",
+                "name": "desc_bold",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "value_size",
+                "value": "40"
+              },
+              {
+                "type": "0",
+                "name": "units_show",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "decimal_places",
+                "value": "2"
+              }
+            ]
+          },
+          {
+            "widgetid": "60434",
+            "type": "item",
+            "name": "",
+            "x": "54",
+            "y": "33",
+            "width": "18",
+            "height": "5",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "4",
+                "name": "itemid.0",
+                "value": "99081"
+              },
+              {
+                "type": "0",
+                "name": "show.0",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "show.1",
+                "value": "2"
+              },
+              {
+                "type": "0",
+                "name": "show.2",
+                "value": "3"
+              },
+              {
+                "type": "0",
+                "name": "show.3",
+                "value": "4"
+              },
+              {
+                "type": "1",
+                "name": "description",
+                "value": "Uptime"
+              },
+              {
+                "type": "0",
+                "name": "desc_size",
+                "value": "20"
+              },
+              {
+                "type": "0",
+                "name": "desc_bold",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "value_size",
+                "value": "40"
+              },
+              {
+                "type": "0",
+                "name": "units_show",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "decimal_places",
+                "value": "2"
+              }
+            ]
+          },
+          {
+            "widgetid": "60435",
+            "type": "problems",
+            "name": "Проблемы абонента",
+            "x": "0",
+            "y": "38",
+            "width": "72",
+            "height": "8",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "3",
+                "name": "hostids.0",
+                "value": "10706"
+              },
+              {
+                "type": "1",
+                "name": "tags.0.tag",
+                "value": "subscriber"
+              },
+              {
+                "type": "0",
+                "name": "tags.0.operator",
+                "value": "1"
+              },
+              {
+                "type": "1",
+                "name": "tags.0.value",
+                "value": "epon 0/1/1 onu 1 lenina205-xleb"
+              },
+              {
+                "type": "0",
+                "name": "evaltype",
+                "value": "0"
+              },
+              {
+                "type": "0",
+                "name": "show_tags",
+                "value": "3"
+              },
+              {
+                "type": "0",
+                "name": "sort_triggers",
+                "value": "3"
+              },
+              {
+                "type": "0",
+                "name": "show_lines",
+                "value": "10"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

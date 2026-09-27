@@ -162,6 +162,26 @@ def main():
                               g_signal, columns=3, rows=2),
         ]}])
 
+    # ---------- Dashboard 4: EPON port ONU summary ----------
+    print("\n=== Dashboard: EPON port summary ===")
+    create(pre + "Сводка по EPON-портам (ONU online/offline)", [{
+        "name": "Сводка по EPON-портам",
+        "widgets": [
+            itemnav_widget(0, 0, 72, 10,
+                           "Сводка по EPON-портам: ONUs online / offline",
+                           "EPON port [*", "scope", 1, "port", 100),
+            honeycomb_widget(0, 10, 36, 10, "ONU online по EPON-портам",
+                             "EPON port [*] ONUs online", "scope", 1, "port",
+                             [(0, "E65660"), (1, "4CAF50")]),
+            honeycomb_widget(36, 10, 36, 10, "ONU offline по EPON-портам",
+                             "EPON port [*] ONUs offline", "scope", 1, "port",
+                             [(0, "4CAF50"), (1, "E65660")]),
+            svggraph_widget(0, 20, 72, 12, "ONU online/offline по EPON-портам (динамика)",
+                            [(hostname, "EPON port [*] ONUs online", "4CAF50"),
+                             (hostname, "EPON port [*] ONUs offline", "E65660")], from_="now-24h"),
+            problems_widget(0, 32, 72, 8, "Проблемы портов (scope=port)", "scope", 1, "port", 25),
+        ]}])
+
 
 
 if __name__ == "__main__":

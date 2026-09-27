@@ -37,3 +37,13 @@ ids = [d["dashboardid"] for d in ds]
 full = api("dashboard.get", {"dashboardids": ids, "selectPages": "extend"}) if ids else []
 open(OUT + "/dashboards/dashboards_structure.json", "w").write(json.dumps(full, indent=2, ensure_ascii=False))
 print("dashboards dumped:", ids)
+
+# one example of a generated per-ONU dashboard (structure reference)
+onu = [d for d in (api("dashboard.get", {"output": ["dashboardid", "name"]}) or [])
+       if d["name"].startswith("ONU ")]
+if onu:
+    ex = api("dashboard.get", {"dashboardids": [onu[0]["dashboardid"]], "selectPages": "extend"})
+    open(OUT + "/dashboards/onu_dashboard_example.json", "w").write(json.dumps(ex, indent=2, ensure_ascii=False))
+    print("example ONU dashboard:", onu[0]["name"], "of", len(onu), "generated")
+else:
+    print("no per-ONU dashboards found (run sync_onu_dashboards.py)")
