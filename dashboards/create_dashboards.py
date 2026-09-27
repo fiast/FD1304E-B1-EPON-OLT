@@ -53,7 +53,10 @@ def problems_widget(x, y, w, h, name, tag, operator=1, value="", lines=20):
 
 
 def itemnav_widget(x, y, w, h, name, item_pattern, tag, operator=1, value="", lines=50):
-    fields = [f(3, "hostids.0", HOST), f(1, "items.0", item_pattern)]
+    patterns = [item_pattern] if isinstance(item_pattern, str) else list(item_pattern)
+    fields = [f(3, "hostids.0", HOST)]
+    for i, p in enumerate(patterns):
+        fields.append(f(1, f"items.{i}", p))
     fields += tags_field("item_tags", tag, operator, value)
     fields += [f(0, "state", 0), f(0, "problems", 1), f(0, "show_lines", lines)]
     return {"type": "itemnavigator", "name": name, "x": str(x), "y": str(y), "width": str(w),
@@ -180,6 +183,28 @@ def main():
                             [(hostname, "EPON port [*] ONUs online", "4CAF50"),
                              (hostname, "EPON port [*] ONUs offline", "E65660")], from_="now-24h"),
             problems_widget(0, 32, 72, 8, "Проблемы портов (scope=port)", "scope", 1, "port", 25),
+        ]}])
+
+    # ---------- Dashboard 5: All dashboards / Global view (ONU overview) ----------
+    print("\n=== Dashboard: All dashboards (Global view) ===")
+    create(pre + "All dashboards (Global view)", [{
+        "name": "ONU: имена, сигналы, статусы",
+        "widgets": [
+            problems_widget(0, 0, 72, 8, "Все проблемы OLT (component=olt)", "component", 1, "olt", 30),
+            itemnav_widget(0, 8, 72, 14,
+                           "ONU: имя (адрес) + сигналы — фильтр по тегу subscriber / onu_port",
+                           ["ONU [*] State", "ONU [*] Rx power", "ONU [*] Tx power", "ONU [*] Temperature"],
+                           "scope", 1, "onu", 300),
+            honeycomb_widget(0, 22, 36, 12, "Доступность ONU (имя / Online-Offline)",
+                             "ONU [*] State", "scope", 1, "onu",
+                             [(1, "4CAF50"), (2, "E65660")]),
+            honeycomb_widget(36, 22, 36, 12, "Карта уровней Rx, dBm (красный < -26)",
+                             "ONU [*] Rx power", "scope", 1, "onu",
+                             [(-26, "E65660"), (-25, "FCCB1D"), (-24, "4CAF50")]),
+            svggraph_widget(0, 34, 72, 12, "Rx всех абонентов, dBm (обзор)",
+                            [(hostname, "ONU [*] Rx power", "1E90FF")], from_="now-6h"),
+            graphproto_widget(0, 46, 72, 16, "Сигнал ONU (Rx/Tx, dBm) по каждому абоненту",
+                              g_signal, columns=3, rows=3),
         ]}])
 
 

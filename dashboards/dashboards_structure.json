@@ -1,6 +1,6 @@
 [
   {
-    "dashboardid": "407",
+    "dashboardid": "423",
     "name": "OLT olt_len204 — Абонент (метрики одного абонента)",
     "userid": "1",
     "private": "0",
@@ -9,12 +9,12 @@
     "uuid": "",
     "pages": [
       {
-        "dashboard_pageid": "16737",
+        "dashboard_pageid": "16765",
         "name": "Абонент",
         "display_period": "0",
         "widgets": [
           {
-            "widgetid": "60409",
+            "widgetid": "60666",
             "type": "itemnavigator",
             "name": "Метрики абонента: в фильтре тегов укажите subscriber = <имя абонента>",
             "x": "0",
@@ -66,7 +66,7 @@
             ]
           },
           {
-            "widgetid": "60410",
+            "widgetid": "60667",
             "type": "problems",
             "name": "Проблемы абонентов (клик по тегу = один абонент)",
             "x": "44",
@@ -123,7 +123,7 @@
             ]
           },
           {
-            "widgetid": "60411",
+            "widgetid": "60668",
             "type": "graphprototype",
             "name": "Сигнал ONU (Rx/Tx, dBm) — по одному графику на абонента",
             "x": "0",
@@ -174,7 +174,7 @@
     ]
   },
   {
-    "dashboardid": "408",
+    "dashboardid": "424",
     "name": "OLT olt_len204 — Абонентские интерфейсы (EPON)",
     "userid": "1",
     "private": "0",
@@ -183,12 +183,12 @@
     "uuid": "",
     "pages": [
       {
-        "dashboard_pageid": "16738",
+        "dashboard_pageid": "16766",
         "name": "Абонентские интерфейсы",
         "display_period": "0",
         "widgets": [
           {
-            "widgetid": "60412",
+            "widgetid": "60669",
             "type": "itemnavigator",
             "name": "EPON порты: статус, ошибки, скорость (в фильтре тегов: interface = <имя>)",
             "x": "0",
@@ -240,7 +240,7 @@
             ]
           },
           {
-            "widgetid": "60413",
+            "widgetid": "60670",
             "type": "problems",
             "name": "Проблемы портов (scope=port)",
             "x": "44",
@@ -297,7 +297,7 @@
             ]
           },
           {
-            "widgetid": "60414",
+            "widgetid": "60671",
             "type": "graphprototype",
             "name": "Трафик интерфейсов (bps)",
             "x": "0",
@@ -344,7 +344,7 @@
             ]
           },
           {
-            "widgetid": "60415",
+            "widgetid": "60672",
             "type": "graphprototype",
             "name": "Ошибки интерфейсов (пакеты)",
             "x": "0",
@@ -395,7 +395,7 @@
     ]
   },
   {
-    "dashboardid": "409",
+    "dashboardid": "425",
     "name": "OLT olt_len204 — Подключения ONU (абоненты)",
     "userid": "1",
     "private": "0",
@@ -404,12 +404,12 @@
     "uuid": "",
     "pages": [
       {
-        "dashboard_pageid": "16739",
+        "dashboard_pageid": "16767",
         "name": "Подключения ONU",
         "display_period": "0",
         "widgets": [
           {
-            "widgetid": "60416",
+            "widgetid": "60673",
             "type": "problems",
             "name": "Проблемы абонентских подключений (scope=onu)",
             "x": "0",
@@ -466,7 +466,7 @@
             ]
           },
           {
-            "widgetid": "60417",
+            "widgetid": "60674",
             "type": "itemnavigator",
             "name": "Подключения ONU: статус, сигналы, uptime (фильтр: subscriber = <имя>)",
             "x": "30",
@@ -518,7 +518,7 @@
             ]
           },
           {
-            "widgetid": "60418",
+            "widgetid": "60675",
             "type": "honeycomb",
             "name": "Доступность ONU (Online / Offline)",
             "x": "0",
@@ -635,7 +635,7 @@
             ]
           },
           {
-            "widgetid": "60419",
+            "widgetid": "60676",
             "type": "honeycomb",
             "name": "Карта Rx абонентов, dBm (красный < -26)",
             "x": "36",
@@ -762,7 +762,7 @@
             ]
           },
           {
-            "widgetid": "60420",
+            "widgetid": "60677",
             "type": "graphprototype",
             "name": "Сигнал ONU (Rx/Tx, dBm) по каждому абоненту",
             "x": "0",
@@ -813,7 +813,7 @@
     ]
   },
   {
-    "dashboardid": "410",
+    "dashboardid": "426",
     "name": "OLT olt_len204 — Сводка по EPON-портам (ONU online/offline)",
     "userid": "1",
     "private": "0",
@@ -822,12 +822,12 @@
     "uuid": "",
     "pages": [
       {
-        "dashboard_pageid": "16740",
+        "dashboard_pageid": "16768",
         "name": "Сводка по EPON-портам",
         "display_period": "0",
         "widgets": [
           {
-            "widgetid": "60421",
+            "widgetid": "60678",
             "type": "itemnavigator",
             "name": "Сводка по EPON-портам: ONUs online / offline",
             "x": "0",
@@ -879,7 +879,7 @@
             ]
           },
           {
-            "widgetid": "60422",
+            "widgetid": "60679",
             "type": "honeycomb",
             "name": "ONU online по EPON-портам",
             "x": "0",
@@ -996,7 +996,7 @@
             ]
           },
           {
-            "widgetid": "60423",
+            "widgetid": "60680",
             "type": "honeycomb",
             "name": "ONU offline по EPON-портам",
             "x": "36",
@@ -1113,7 +1113,7 @@
             ]
           },
           {
-            "widgetid": "60424",
+            "widgetid": "60681",
             "type": "svggraph",
             "name": "ONU online/offline по EPON-портам (динамика)",
             "x": "0",
@@ -1180,7 +1180,7 @@
             ]
           },
           {
-            "widgetid": "60425",
+            "widgetid": "60682",
             "type": "problems",
             "name": "Проблемы портов (scope=port)",
             "x": "0",
@@ -1233,6 +1233,491 @@
                 "type": "0",
                 "name": "show_lines",
                 "value": "25"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "dashboardid": "427",
+    "name": "OLT olt_len204 — All dashboards (Global view)",
+    "userid": "1",
+    "private": "0",
+    "display_period": "30",
+    "auto_start": "1",
+    "uuid": "",
+    "pages": [
+      {
+        "dashboard_pageid": "16769",
+        "name": "ONU: имена, сигналы, статусы",
+        "display_period": "0",
+        "widgets": [
+          {
+            "widgetid": "60683",
+            "type": "problems",
+            "name": "Все проблемы OLT (component=olt)",
+            "x": "0",
+            "y": "0",
+            "width": "72",
+            "height": "8",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "3",
+                "name": "hostids.0",
+                "value": "10706"
+              },
+              {
+                "type": "1",
+                "name": "tags.0.tag",
+                "value": "component"
+              },
+              {
+                "type": "0",
+                "name": "tags.0.operator",
+                "value": "1"
+              },
+              {
+                "type": "1",
+                "name": "tags.0.value",
+                "value": "olt"
+              },
+              {
+                "type": "0",
+                "name": "evaltype",
+                "value": "0"
+              },
+              {
+                "type": "0",
+                "name": "show_tags",
+                "value": "3"
+              },
+              {
+                "type": "0",
+                "name": "show_suppressed",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "sort_triggers",
+                "value": "3"
+              },
+              {
+                "type": "0",
+                "name": "show_lines",
+                "value": "30"
+              }
+            ]
+          },
+          {
+            "widgetid": "60684",
+            "type": "itemnavigator",
+            "name": "ONU: имя (адрес) + сигналы — фильтр по тегу subscriber / onu_port",
+            "x": "0",
+            "y": "8",
+            "width": "72",
+            "height": "14",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "3",
+                "name": "hostids.0",
+                "value": "10706"
+              },
+              {
+                "type": "1",
+                "name": "items.0",
+                "value": "ONU [*] State"
+              },
+              {
+                "type": "1",
+                "name": "items.1",
+                "value": "ONU [*] Rx power"
+              },
+              {
+                "type": "1",
+                "name": "items.2",
+                "value": "ONU [*] Tx power"
+              },
+              {
+                "type": "1",
+                "name": "items.3",
+                "value": "ONU [*] Temperature"
+              },
+              {
+                "type": "1",
+                "name": "item_tags.0.tag",
+                "value": "scope"
+              },
+              {
+                "type": "0",
+                "name": "item_tags.0.operator",
+                "value": "1"
+              },
+              {
+                "type": "1",
+                "name": "item_tags.0.value",
+                "value": "onu"
+              },
+              {
+                "type": "0",
+                "name": "state",
+                "value": "0"
+              },
+              {
+                "type": "0",
+                "name": "problems",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "show_lines",
+                "value": "300"
+              }
+            ]
+          },
+          {
+            "widgetid": "60685",
+            "type": "honeycomb",
+            "name": "Доступность ONU (имя / Online-Offline)",
+            "x": "0",
+            "y": "22",
+            "width": "36",
+            "height": "12",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "3",
+                "name": "hostids.0",
+                "value": "10706"
+              },
+              {
+                "type": "1",
+                "name": "items.0",
+                "value": "ONU [*] State"
+              },
+              {
+                "type": "1",
+                "name": "item_tags.0.tag",
+                "value": "scope"
+              },
+              {
+                "type": "0",
+                "name": "item_tags.0.operator",
+                "value": "1"
+              },
+              {
+                "type": "1",
+                "name": "item_tags.0.value",
+                "value": "onu"
+              },
+              {
+                "type": "0",
+                "name": "show.0",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "show.1",
+                "value": "2"
+              },
+              {
+                "type": "0",
+                "name": "primary_label_type",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "primary_label",
+                "value": "{ITEM.NAME}"
+              },
+              {
+                "type": "0",
+                "name": "primary_label_decimal_places",
+                "value": "0"
+              },
+              {
+                "type": "0",
+                "name": "primary_label_size_type",
+                "value": "0"
+              },
+              {
+                "type": "0",
+                "name": "primary_label_size",
+                "value": "20"
+              },
+              {
+                "type": "0",
+                "name": "secondary_label_type",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "secondary_label_size_type",
+                "value": "0"
+              },
+              {
+                "type": "0",
+                "name": "secondary_label_size",
+                "value": "30"
+              },
+              {
+                "type": "0",
+                "name": "secondary_label_decimal_places",
+                "value": "2"
+              },
+              {
+                "type": "0",
+                "name": "maintenance",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.0.color",
+                "value": "4CAF50"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.0.threshold",
+                "value": "1"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.1.color",
+                "value": "E65660"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.1.threshold",
+                "value": "2"
+              }
+            ]
+          },
+          {
+            "widgetid": "60686",
+            "type": "honeycomb",
+            "name": "Карта уровней Rx, dBm (красный < -26)",
+            "x": "36",
+            "y": "22",
+            "width": "36",
+            "height": "12",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "3",
+                "name": "hostids.0",
+                "value": "10706"
+              },
+              {
+                "type": "1",
+                "name": "items.0",
+                "value": "ONU [*] Rx power"
+              },
+              {
+                "type": "1",
+                "name": "item_tags.0.tag",
+                "value": "scope"
+              },
+              {
+                "type": "0",
+                "name": "item_tags.0.operator",
+                "value": "1"
+              },
+              {
+                "type": "1",
+                "name": "item_tags.0.value",
+                "value": "onu"
+              },
+              {
+                "type": "0",
+                "name": "show.0",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "show.1",
+                "value": "2"
+              },
+              {
+                "type": "0",
+                "name": "primary_label_type",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "primary_label",
+                "value": "{ITEM.NAME}"
+              },
+              {
+                "type": "0",
+                "name": "primary_label_decimal_places",
+                "value": "0"
+              },
+              {
+                "type": "0",
+                "name": "primary_label_size_type",
+                "value": "0"
+              },
+              {
+                "type": "0",
+                "name": "primary_label_size",
+                "value": "20"
+              },
+              {
+                "type": "0",
+                "name": "secondary_label_type",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "secondary_label_size_type",
+                "value": "0"
+              },
+              {
+                "type": "0",
+                "name": "secondary_label_size",
+                "value": "30"
+              },
+              {
+                "type": "0",
+                "name": "secondary_label_decimal_places",
+                "value": "2"
+              },
+              {
+                "type": "0",
+                "name": "maintenance",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.0.color",
+                "value": "E65660"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.0.threshold",
+                "value": "-26"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.1.color",
+                "value": "FCCB1D"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.1.threshold",
+                "value": "-25"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.2.color",
+                "value": "4CAF50"
+              },
+              {
+                "type": "1",
+                "name": "thresholds.2.threshold",
+                "value": "-24"
+              }
+            ]
+          },
+          {
+            "widgetid": "60687",
+            "type": "svggraph",
+            "name": "Rx всех абонентов, dBm (обзор)",
+            "x": "0",
+            "y": "34",
+            "width": "72",
+            "height": "12",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "1",
+                "name": "ds.0.hosts.0",
+                "value": "olt_len204"
+              },
+              {
+                "type": "1",
+                "name": "ds.0.items.0",
+                "value": "ONU [*] Rx power"
+              },
+              {
+                "type": "1",
+                "name": "ds.0.color",
+                "value": "1E90FF"
+              },
+              {
+                "type": "0",
+                "name": "legend_statistic",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "legend_lines",
+                "value": "2"
+              },
+              {
+                "type": "0",
+                "name": "righty",
+                "value": "0"
+              },
+              {
+                "type": "1",
+                "name": "time_period.from",
+                "value": "now-6h"
+              },
+              {
+                "type": "1",
+                "name": "time_period.to",
+                "value": "now"
+              }
+            ]
+          },
+          {
+            "widgetid": "60688",
+            "type": "graphprototype",
+            "name": "Сигнал ONU (Rx/Tx, dBm) по каждому абоненту",
+            "x": "0",
+            "y": "46",
+            "width": "72",
+            "height": "16",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "0",
+                "name": "source_type",
+                "value": "0"
+              },
+              {
+                "type": "7",
+                "name": "graphid.0",
+                "value": "7744"
+              },
+              {
+                "type": "0",
+                "name": "columns",
+                "value": "3"
+              },
+              {
+                "type": "0",
+                "name": "rows",
+                "value": "3"
+              },
+              {
+                "type": "0",
+                "name": "show_legend",
+                "value": "1"
+              },
+              {
+                "type": "1",
+                "name": "time_period.from",
+                "value": "now-3h"
+              },
+              {
+                "type": "1",
+                "name": "time_period.to",
+                "value": "now"
               }
             ]
           }

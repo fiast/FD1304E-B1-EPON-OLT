@@ -9,14 +9,14 @@
     "uuid": "",
     "pages": [
       {
-        "dashboard_pageid": "16741",
+        "dashboard_pageid": "16753",
         "name": "Абонент",
         "display_period": "0",
         "widgets": [
           {
-            "widgetid": "60426",
+            "widgetid": "60546",
             "type": "gauge",
-            "name": "",
+            "name": "Уровень сигнала Rx (последний, dBm)",
             "x": "0",
             "y": "0",
             "width": "24",
@@ -131,9 +131,9 @@
             ]
           },
           {
-            "widgetid": "60427",
+            "widgetid": "60547",
             "type": "gauge",
-            "name": "",
+            "name": "Уровень сигнала Tx (последний, dBm)",
             "x": "24",
             "y": "0",
             "width": "24",
@@ -238,9 +238,9 @@
             ]
           },
           {
-            "widgetid": "60428",
+            "widgetid": "60548",
             "type": "item",
-            "name": "",
+            "name": "Состояние ONU",
             "x": "48",
             "y": "0",
             "width": "24",
@@ -305,7 +305,7 @@
             ]
           },
           {
-            "widgetid": "60429",
+            "widgetid": "60549",
             "type": "svggraph",
             "name": "Сигнал ONU (Rx/Tx, dBm)",
             "x": "0",
@@ -362,7 +362,7 @@
             ]
           },
           {
-            "widgetid": "60430",
+            "widgetid": "60550",
             "type": "svggraph",
             "name": "Мощность сигнала Rx, dBm",
             "x": "0",
@@ -409,9 +409,9 @@
             ]
           },
           {
-            "widgetid": "60431",
+            "widgetid": "60551",
             "type": "item",
-            "name": "",
+            "name": "Температура",
             "x": "0",
             "y": "33",
             "width": "18",
@@ -476,9 +476,9 @@
             ]
           },
           {
-            "widgetid": "60432",
+            "widgetid": "60552",
             "type": "item",
-            "name": "",
+            "name": "Напряжение",
             "x": "18",
             "y": "33",
             "width": "18",
@@ -543,9 +543,9 @@
             ]
           },
           {
-            "widgetid": "60433",
+            "widgetid": "60553",
             "type": "item",
-            "name": "",
+            "name": "Ток смещения",
             "x": "36",
             "y": "33",
             "width": "18",
@@ -610,9 +610,9 @@
             ]
           },
           {
-            "widgetid": "60434",
+            "widgetid": "60554",
             "type": "item",
-            "name": "",
+            "name": "Uptime ONU",
             "x": "54",
             "y": "33",
             "width": "18",
@@ -677,7 +677,7 @@
             ]
           },
           {
-            "widgetid": "60435",
+            "widgetid": "60555",
             "type": "problems",
             "name": "Проблемы абонента",
             "x": "0",

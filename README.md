@@ -67,6 +67,9 @@
   Online/Offline, тепловая карта Rx, таблица подключений, графики сигналов.
 * **Сводка по EPON-портам** — сколько ONU **online/offline на каждый EPON-порт**
   (таблица + honeycomb + график динамики).
+* **All dashboards (Global view)** — общий дашборд-обзор: все проблемы OLT, таблица ONU
+  (**имя/адрес + State, Rx, Tx, температура**), honeycomb доступности, карта уровней Rx,
+  график Rx всех абонентов и сетка графиков сигнала по каждому абоненту.
 
 ### Дашборд на каждого абонента (автоматически)
 Zabbix (7.4) **не имеет объекта «прототип дашборда»**, поэтому его роль выполняет скрипт
@@ -126,7 +129,7 @@ export ZABBIX_TEMPLATEID="<template id>"
 export ZABBIX_DASH_PREFIX="OLT"
 python3 dashboards/create_dashboards.py
 ```
-Создаются четыре публичных дашборда:
+Создаются пять публичных дашбордов:
 * **`OLT <host> — Абонент (метрики одного абонента)`** — `Item navigator` со всеми метриками ONU
   (фильтр по тегу `subscriber`), `Problems` абонентов, сетка графиков Rx/Tx по каждому абоненту.
 * **`OLT <host> — Абонентские интерфейсы (EPON)`** — таблица EPON-портов (статус, ошибки,
@@ -143,6 +146,18 @@ python3 dashboards/create_dashboards.py
   online/offline на каждом EPON-порту: таблица, два honeycomb (online/offline) и график
   динамики за 24 ч. Значения берутся из итемов
   `EPON port [<порт>] ONUs online` / `... OFFline` (calculated item, см. ниже).
+* **`OLT <host> — All dashboards (Global view)`** — общий дашборд-обзор (рекомендуется
+  как дашборд по умолчанию):
+  * `Problems` — все проблемы OLT (тег `component=olt`);
+  * `Item navigator` — таблица ONU: **имя (адрес) + State, Rx power, Tx power, Temperature**
+    (4 шаблона итемов, фильтр по тегу `subscriber`/`onu_port` внутри виджета);
+  * **honeycomb «Доступность ONU»** — имя ONU + Online/Offline;
+  * **honeycomb «Карта уровней Rx»** — цветовая карта сигналов по абонентам;
+  * **график «Rx всех абонентов»** — все ONU на одном графике (обзор деградаций);
+  * **сетка графиков «Сигнал ONU (Rx/Tx)»** — по одному графику на абонента.
+
+> Чтобы общий дашборд открывался сразу при входе: **User settings → Dashboard** и выбрать
+> `OLT <host> — All dashboards (Global view)` (в Zabbix 7.x это персональная настройка пользователя).
 
 > Honeycomb использует «плитку» на каждый найденный item (паттерн `ONU [*] ...` + тег
 > `scope=onu`), поэтому новые абоненты появляются на карте автоматически после LLD.
