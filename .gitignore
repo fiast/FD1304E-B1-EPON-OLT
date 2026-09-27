@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Secrets / local config
+.env
+*.token
+token.txt
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store

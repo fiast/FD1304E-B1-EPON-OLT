@@ -1,0 +1,397 @@
+[
+  {
+    "dashboardid": "402",
+    "name": "OLT olt_len204 — Абонент (метрики одного абонента)",
+    "userid": "1",
+    "private": "0",
+    "display_period": "30",
+    "auto_start": "1",
+    "uuid": "",
+    "pages": [
+      {
+        "dashboard_pageid": "16732",
+        "name": "Абонент",
+        "display_period": "0",
+        "widgets": [
+          {
+            "widgetid": "60390",
+            "type": "itemnavigator",
+            "name": "Метрики абонента: в фильтре тегов укажите subscriber = <имя абонента>",
+            "x": "0",
+            "y": "0",
+            "width": "44",
+            "height": "10",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "3",
+                "name": "hostids.0",
+                "value": "10706"
+              },
+              {
+                "type": "1",
+                "name": "items.0",
+                "value": "ONU [*"
+              },
+              {
+                "type": "1",
+                "name": "item_tags.0.tag",
+                "value": "subscriber"
+              },
+              {
+                "type": "0",
+                "name": "item_tags.0.operator",
+                "value": "4"
+              },
+              {
+                "type": "1",
+                "name": "item_tags.0.value",
+                "value": ""
+              },
+              {
+                "type": "0",
+                "name": "state",
+                "value": "0"
+              },
+              {
+                "type": "0",
+                "name": "problems",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "show_lines",
+                "value": "100"
+              }
+            ]
+          },
+          {
+            "widgetid": "60391",
+            "type": "problems",
+            "name": "Проблемы абонентов (клик по тегу = один абонент)",
+            "x": "44",
+            "y": "0",
+            "width": "28",
+            "height": "10",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "3",
+                "name": "hostids.0",
+                "value": "10706"
+              },
+              {
+                "type": "1",
+                "name": "tags.0.tag",
+                "value": "subscriber"
+              },
+              {
+                "type": "0",
+                "name": "tags.0.operator",
+                "value": "4"
+              },
+              {
+                "type": "1",
+                "name": "tags.0.value",
+                "value": ""
+              },
+              {
+                "type": "0",
+                "name": "evaltype",
+                "value": "0"
+              },
+              {
+                "type": "0",
+                "name": "show_tags",
+                "value": "3"
+              },
+              {
+                "type": "0",
+                "name": "show_suppressed",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "sort_triggers",
+                "value": "3"
+              },
+              {
+                "type": "0",
+                "name": "show_lines",
+                "value": "25"
+              }
+            ]
+          },
+          {
+            "widgetid": "60392",
+            "type": "graphprototype",
+            "name": "Сигнал ONU (Rx/Tx, dBm) — по одному графику на абонента",
+            "x": "0",
+            "y": "10",
+            "width": "72",
+            "height": "16",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "0",
+                "name": "source_type",
+                "value": "0"
+              },
+              {
+                "type": "7",
+                "name": "graphid.0",
+                "value": "7744"
+              },
+              {
+                "type": "0",
+                "name": "columns",
+                "value": "3"
+              },
+              {
+                "type": "0",
+                "name": "rows",
+                "value": "3"
+              },
+              {
+                "type": "0",
+                "name": "show_legend",
+                "value": "1"
+              },
+              {
+                "type": "1",
+                "name": "time_period.from",
+                "value": "now-3h"
+              },
+              {
+                "type": "1",
+                "name": "time_period.to",
+                "value": "now"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "dashboardid": "403",
+    "name": "OLT olt_len204 — Абонентские интерфейсы (EPON)",
+    "userid": "1",
+    "private": "0",
+    "display_period": "30",
+    "auto_start": "1",
+    "uuid": "",
+    "pages": [
+      {
+        "dashboard_pageid": "16733",
+        "name": "Абонентские интерфейсы",
+        "display_period": "0",
+        "widgets": [
+          {
+            "widgetid": "60393",
+            "type": "itemnavigator",
+            "name": "EPON порты: статус, ошибки, скорость (в фильтре тегов: interface = <имя>)",
+            "x": "0",
+            "y": "0",
+            "width": "44",
+            "height": "10",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "3",
+                "name": "hostids.0",
+                "value": "10706"
+              },
+              {
+                "type": "1",
+                "name": "items.0",
+                "value": "Interface [epon*"
+              },
+              {
+                "type": "1",
+                "name": "item_tags.0.tag",
+                "value": "scope"
+              },
+              {
+                "type": "0",
+                "name": "item_tags.0.operator",
+                "value": "1"
+              },
+              {
+                "type": "1",
+                "name": "item_tags.0.value",
+                "value": "port"
+              },
+              {
+                "type": "0",
+                "name": "state",
+                "value": "0"
+              },
+              {
+                "type": "0",
+                "name": "problems",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "show_lines",
+                "value": "100"
+              }
+            ]
+          },
+          {
+            "widgetid": "60394",
+            "type": "problems",
+            "name": "Проблемы портов (scope=port)",
+            "x": "44",
+            "y": "0",
+            "width": "28",
+            "height": "10",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "3",
+                "name": "hostids.0",
+                "value": "10706"
+              },
+              {
+                "type": "1",
+                "name": "tags.0.tag",
+                "value": "scope"
+              },
+              {
+                "type": "0",
+                "name": "tags.0.operator",
+                "value": "1"
+              },
+              {
+                "type": "1",
+                "name": "tags.0.value",
+                "value": "port"
+              },
+              {
+                "type": "0",
+                "name": "evaltype",
+                "value": "0"
+              },
+              {
+                "type": "0",
+                "name": "show_tags",
+                "value": "3"
+              },
+              {
+                "type": "0",
+                "name": "show_suppressed",
+                "value": "1"
+              },
+              {
+                "type": "0",
+                "name": "sort_triggers",
+                "value": "3"
+              },
+              {
+                "type": "0",
+                "name": "show_lines",
+                "value": "25"
+              }
+            ]
+          },
+          {
+            "widgetid": "60395",
+            "type": "graphprototype",
+            "name": "Трафик интерфейсов (bps)",
+            "x": "0",
+            "y": "10",
+            "width": "72",
+            "height": "14",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "0",
+                "name": "source_type",
+                "value": "0"
+              },
+              {
+                "type": "7",
+                "name": "graphid.0",
+                "value": "7746"
+              },
+              {
+                "type": "0",
+                "name": "columns",
+                "value": "3"
+              },
+              {
+                "type": "0",
+                "name": "rows",
+                "value": "2"
+              },
+              {
+                "type": "0",
+                "name": "show_legend",
+                "value": "1"
+              },
+              {
+                "type": "1",
+                "name": "time_period.from",
+                "value": "now-3h"
+              },
+              {
+                "type": "1",
+                "name": "time_period.to",
+                "value": "now"
+              }
+            ]
+          },
+          {
+            "widgetid": "60396",
+            "type": "graphprototype",
+            "name": "Ошибки интерфейсов (пакеты)",
+            "x": "0",
+            "y": "24",
+            "width": "72",
+            "height": "14",
+            "view_mode": "0",
+            "fields": [
+              {
+                "type": "0",
+                "name": "source_type",
+                "value": "0"
+              },
+              {
+                "type": "7",
+                "name": "graphid.0",
+                "value": "7748"
+              },
+              {
+                "type": "0",
+                "name": "columns",
+                "value": "3"
+              },
+              {
+                "type": "0",
+                "name": "rows",
+                "value": "2"
+              },
+              {
+                "type": "0",
+                "name": "show_legend",
+                "value": "1"
+              },
+              {
+                "type": "1",
+                "name": "time_period.from",
+                "value": "now-3h"
+              },
+              {
+                "type": "1",
+                "name": "time_period.to",
+                "value": "now"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

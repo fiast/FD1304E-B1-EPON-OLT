@@ -1,0 +1,1295 @@
+zabbix_export:
+  version: '7.4'
+  template_groups:
+    - uuid: e76ae8c1c5cb4865ac8cecb1975c2129
+      name: CDATA
+  templates:
+    - uuid: e98d2c0cd54744f4b1e4514c760f7c24
+      template: C-Data_FD1304E-B1_EPON_OLT
+      name: 'C-Data FD1304E-B1 EPON OLT'
+      description: |
+        C-Data FD1304E-B1 - EPON OLT monitoring via SNMP (BDCOM/C-Data enterprise OID .1.3.6.1.4.1.17409).
+        
+        LLD (low-level discovery) over SNMP walk:
+          * ONU discovery  - subscriber name/state (online/offline), optical parameters:
+                             Rx/Tx power (dBm), voltage (V), temperature (C), bias current (mA), uptime
+          * Interface LLD  - admin/oper status, speed, in/out octets, in/out traffic (bps), in/out errors
+        
+        Implementation notes:
+          * Master items use SNMP OID "walk[<oid>]" + JavaScript preprocessing that converts
+            the raw walk text into a JSON array [{idx,val}] used by dependent LLD/item prototypes.
+          * Zabbix 7.4.5 substitutes the LLD macro {#SNMPINDEX} inside preprocessing parameters
+            as '#<value>' (stray '#'), so per-ONU/port extraction is done in JavaScript
+            (see the "JavaScript" preprocessing step of the item prototypes).
+        
+        Requires host macros: {$SNMP_COMMUNITY}.
+        Tuning macros: {$CDATA.ONU.RX_MIN} (-26), {$CDATA.ONU.RX_OK} (-24), {$CDATA.ONU.TEMP_MAX} (60),
+                       {$CDATA.IF.ERRORS_WARN} (1).
+        
+        Tags (use them to look at one subscriber/interface only):
+          * ONU items/triggers:      scope=onu, component=olt, subscriber=<ONU name>, onu_id=<ONU id>
+          * Interface items/triggers: scope=port, component=olt, interface=<ifName>, ifindex=<ifIndex>
+          In Monitoring -> Latest data / Problems click a tag value to filter by this subscriber.
+        
+        Graph prototypes (for the built-in "Graph prototype" dashboard widget):
+          * ONU [{#SNMPVALUE}] optical signal  - Rx/Tx (dBm)
+          * Interface [{#SNMPVALUE}] traffic   - in/out bps
+          * Interface [{#SNMPVALUE}] errors    - in/out error packets
+        
+        Dashboards are created by create_dashboards.py:
+          * "OLT olt_len204 - Абонент (метрики одного абонента)"
+          * "OLT olt_len204 - Абонентские интерфейсы (EPON)"
+        
+        Note: the "[<if>] port is down" trigger fires for every interface with ifAdminStatus=up and
+        ifOperStatus=down, including spare (unconnected) ports. Disable it if it is too noisy.
+        
+      groups:
+        - name: CDATA
+      items:
+        - uuid: b5fc52338dc64019875580966f475a1a
+          name: 'Interface admin status (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.2.1.2.2.1.7]'
+          key: cdata.if.admin
+          delay: 2m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.2.1.2.2.1.7; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.2.1.2.2.1.7";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf('.');
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+        - uuid: a52221604c16474a9119dba1367a7479
+          name: 'Interface input errors (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.2.1.2.2.1.14]'
+          key: cdata.if.inerrors
+          delay: 2m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.2.1.2.2.1.14; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.2.1.2.2.1.14";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf('.');
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+        - uuid: 52cec598d0d6423da1097b222774ed8c
+          name: 'Interface input octets (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.2.1.2.2.1.10]'
+          key: cdata.if.inoctets
+          delay: 2m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.2.1.2.2.1.10; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.2.1.2.2.1.10";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf('.');
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+        - uuid: a645ef9d13d942bb9878b1c36d203e3b
+          name: 'Interface names (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.2.1.2.2.1.2]'
+          key: cdata.if.name
+          delay: 2m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.2.1.2.2.1.2; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.2.1.2.2.1.2";
+                  var ki = "{" + "#SNMPINDEX}";
+                  var kv = "{" + "#SNMPVALUE}";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf('.');
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      var o = {}; o[ki] = idx; o[kv] = v; out.push(o);
+                  }
+                  return JSON.stringify(out);
+        - uuid: ae75225ba1404880b604d82e57cacf72
+          name: 'Interface oper status (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.2.1.2.2.1.8]'
+          key: cdata.if.oper
+          delay: 2m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.2.1.2.2.1.8; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.2.1.2.2.1.8";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf('.');
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+        - uuid: de316d722e8c4fdeaa92b1699a23154a
+          name: 'Interface output errors (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.2.1.2.2.1.20]'
+          key: cdata.if.outerrors
+          delay: 2m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.2.1.2.2.1.20; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.2.1.2.2.1.20";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf('.');
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+        - uuid: 8d5dec741532473ca1fedc2c39bfd6c3
+          name: 'Interface output octets (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.2.1.2.2.1.16]'
+          key: cdata.if.outoctets
+          delay: 2m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.2.1.2.2.1.16; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.2.1.2.2.1.16";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf('.');
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+        - uuid: dcfec30ffb6c403ca046d40e05b146bd
+          name: 'Interface speed (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.2.1.2.2.1.5]'
+          key: cdata.if.speed
+          delay: 5m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.2.1.2.2.1.5; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.2.1.2.2.1.5";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf('.');
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+        - uuid: adde936a090a4055b08ccb0fe5a00aa7
+          name: 'ONU bias current (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.4.1.17409.2.3.4.2.1.8]'
+          key: cdata.onu.bias
+          delay: 5m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.4.1.17409.2.3.4.2.1.8; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.4.1.17409.2.3.4.2.1.8";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf('.');
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+        - uuid: cb6ae5c45eab4af9a1beab7dd61ae89e
+          name: 'ONU names (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.4.1.17409.2.3.4.1.1.2]'
+          key: cdata.onu.name
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.4.1.17409.2.3.4.1.1.2; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.4.1.17409.2.3.4.1.1.2";
+                  var ki = "{" + "#SNMPINDEX}";
+                  var kv = "{" + "#SNMPVALUE}";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf('.');
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      var o = {}; o[ki] = idx; o[kv] = v; out.push(o);
+                  }
+                  return JSON.stringify(out);
+        - uuid: 77e37ed514f84a5098703aebabdc4eab
+          name: 'ONU Rx power (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.4.1.17409.2.3.4.2.1.4]'
+          key: cdata.onu.rx
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.4.1.17409.2.3.4.2.1.4; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.4.1.17409.2.3.4.2.1.4";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf('.');
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+        - uuid: 2c8dd122bad944b088f2ce0089de9912
+          name: 'ONU online state (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.4.1.17409.2.3.4.1.1.8]'
+          key: cdata.onu.state
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.4.1.17409.2.3.4.1.1.8; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.4.1.17409.2.3.4.1.1.8";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf('.');
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+        - uuid: e8d357de2e214756bb8310d70749c214
+          name: 'ONU temperature (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.4.1.17409.2.3.4.2.1.7]'
+          key: cdata.onu.temp
+          delay: 2m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.4.1.17409.2.3.4.2.1.7; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.4.1.17409.2.3.4.2.1.7";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf('.');
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+        - uuid: b62db859ce4d4923b555cbbe07690a1c
+          name: 'ONU Tx power (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.4.1.17409.2.3.4.2.1.5]'
+          key: cdata.onu.tx
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.4.1.17409.2.3.4.2.1.5; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.4.1.17409.2.3.4.2.1.5";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf('.');
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+        - uuid: 4c0d3e30352a48aa8ca74fbb4467158a
+          name: 'ONU uptime (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.4.1.17409.2.3.4.1.1.18]'
+          key: cdata.onu.uptime
+          delay: 5m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.4.1.17409.2.3.4.1.1.18; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.4.1.17409.2.3.4.1.1.18";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf('.');
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+        - uuid: 115fc8a8c83845448bdcc428dcd43453
+          name: 'ONU voltage (walk)'
+          type: SNMP_AGENT
+          snmp_oid: 'walk[.1.3.6.1.4.1.17409.2.3.4.2.1.6]'
+          key: cdata.onu.voltage
+          delay: 2m
+          value_type: TEXT
+          description: 'SNMP walk .1.3.6.1.4.1.17409.2.3.4.2.1.6; JSON normalised for LLD recursion.'
+          preprocessing:
+            - type: JAVASCRIPT
+              parameters:
+                - |
+                  var base = ".1.3.6.1.4.1.17409.2.3.4.2.1.6";
+                  var lines = value.split("\n");
+                  var out = [];
+                  for (var i = 0; i < lines.length; i++) {
+                      var line = lines[i];
+                      var eq = line.indexOf(" = ");
+                      if (eq < 1) { continue; }
+                      var oid = line.substring(0, eq);
+                      var rest = line.substring(eq + 3);
+                      var c = rest.indexOf(": ");
+                      var v = (c < 0) ? rest : rest.substring(c + 2);
+                      if (v.length > 1 && v.charAt(0) === '"' && v.charAt(v.length - 1) === '"') { v = v.substring(1, v.length - 1); }
+                      var idx = oid.substring(base.length + 1);
+                      var d = idx.indexOf('.');
+                      if (d > 0) { idx = idx.substring(0, d); }
+                      out.push({idx: idx, val: v});
+                  }
+                  return JSON.stringify(out);
+        - uuid: 3af4863a87d54b61ac32915930b16101
+          name: 'Device contact'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.4.0
+          key: cdata.system.contact
+          delay: 1h
+          value_type: CHAR
+          description: 'SNMP OID .1.3.6.1.2.1.1.4.0'
+        - uuid: e9fc55c3c9574ceb855586fddd878df9
+          name: 'Device description'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.1.0
+          key: cdata.system.descr
+          delay: 1h
+          value_type: TEXT
+          description: 'SNMP OID .1.3.6.1.2.1.1.1.0'
+        - uuid: fe83a066e52c42cc90e0da7934db45b1
+          name: 'Device location'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.6.0
+          key: cdata.system.location
+          delay: 1h
+          value_type: CHAR
+          description: 'SNMP OID .1.3.6.1.2.1.1.6.0'
+        - uuid: 618190f57b394caa81ff54f484e0f04f
+          name: 'Device name'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.5.0
+          key: cdata.system.name
+          delay: 5m
+          value_type: TEXT
+          description: 'SNMP OID .1.3.6.1.2.1.1.5.0'
+        - uuid: fab18dfe3e9245f4ade05cb0935c2763
+          name: 'Device object ID'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.2.0
+          key: cdata.system.objectid
+          delay: 1h
+          value_type: CHAR
+          description: 'SNMP OID .1.3.6.1.2.1.1.2.0'
+        - uuid: f873c74cab384e94b1fac45471a7a612
+          name: 'Device uptime'
+          type: SNMP_AGENT
+          snmp_oid: .1.3.6.1.2.1.1.3.0
+          key: cdata.system.uptime
+          delay: 5m
+          units: uptime
+          description: 'SNMP OID .1.3.6.1.2.1.1.3.0'
+      discovery_rules:
+        - uuid: a8ed4931a04d4b278ccbd7e1b9e2b429
+          name: 'Interface discovery'
+          type: DEPENDENT
+          key: cdata.if.lld
+          description: 'Discovers physical/EPON interfaces by SNMP walk of ifDescr.'
+          item_prototypes:
+            - uuid: 2fec6475baf644b6b26cc1d86e07354b
+              name: 'Interface [{#SNMPVALUE}] Admin status'
+              type: DEPENDENT
+              key: 'cdata.if.admin[{#SNMPINDEX}]'
+              valuemap:
+                name: 'C-Data interface state'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+$'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: cdata.if.admin
+              tags:
+                - tag: component
+                  value: olt
+                - tag: ifindex
+                  value: '{#SNMPINDEX}'
+                - tag: interface
+                  value: '{#SNMPVALUE}'
+                - tag: scope
+                  value: port
+            - uuid: 303b575c1c834e7e94d1746ac93a99e0
+              name: 'Interface [{#SNMPVALUE}] In traffic'
+              type: DEPENDENT
+              key: 'cdata.if.inbps[{#SNMPINDEX}]'
+              value_type: FLOAT
+              units: bps
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+$'
+                  error_handler: DISCARD_VALUE
+                - type: CHANGE_PER_SECOND
+                - type: MULTIPLIER
+                  parameters:
+                    - '8'
+              master_item:
+                key: cdata.if.inoctets
+              tags:
+                - tag: component
+                  value: olt
+                - tag: ifindex
+                  value: '{#SNMPINDEX}'
+                - tag: interface
+                  value: '{#SNMPVALUE}'
+                - tag: scope
+                  value: port
+            - uuid: d82ad312c54b4bcd8c6aef68936706f7
+              name: 'Interface [{#SNMPVALUE}] In errors'
+              type: DEPENDENT
+              key: 'cdata.if.inerrors[{#SNMPINDEX}]'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+$'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: cdata.if.inerrors
+              tags:
+                - tag: component
+                  value: olt
+                - tag: ifindex
+                  value: '{#SNMPINDEX}'
+                - tag: interface
+                  value: '{#SNMPVALUE}'
+                - tag: scope
+                  value: port
+              trigger_prototypes:
+                - uuid: 55ac21e395ee4439b9a02e329eb68f32
+                  expression: 'change(/C-Data_FD1304E-B1_EPON_OLT/cdata.if.inerrors[{#SNMPINDEX}]) > {$CDATA.IF.ERRORS_WARN}'
+                  recovery_mode: RECOVERY_EXPRESSION
+                  recovery_expression: 'change(/C-Data_FD1304E-B1_EPON_OLT/cdata.if.inerrors[{#SNMPINDEX}]) = 0'
+                  name: '[{#SNMPVALUE}] input errors detected'
+                  priority: WARNING
+                  tags:
+                    - tag: component
+                      value: olt
+                    - tag: ifindex
+                      value: '{#SNMPINDEX}'
+                    - tag: interface
+                      value: '{#SNMPVALUE}'
+                    - tag: scope
+                      value: port
+            - uuid: 8e041de8f5a34271929a052a0d553dcd
+              name: 'Interface [{#SNMPVALUE}] In octets'
+              type: DEPENDENT
+              key: 'cdata.if.inoctets[{#SNMPINDEX}]'
+              units: B
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+$'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: cdata.if.inoctets
+              tags:
+                - tag: component
+                  value: olt
+                - tag: ifindex
+                  value: '{#SNMPINDEX}'
+                - tag: interface
+                  value: '{#SNMPVALUE}'
+                - tag: scope
+                  value: port
+            - uuid: 9438fe3499234436a9c1d752524e7710
+              name: 'Interface [{#SNMPVALUE}] Oper status'
+              type: DEPENDENT
+              key: 'cdata.if.oper[{#SNMPINDEX}]'
+              valuemap:
+                name: 'C-Data interface state'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+$'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: cdata.if.oper
+              tags:
+                - tag: component
+                  value: olt
+                - tag: ifindex
+                  value: '{#SNMPINDEX}'
+                - tag: interface
+                  value: '{#SNMPVALUE}'
+                - tag: scope
+                  value: port
+            - uuid: c9bda67479a24470b4b89b7496cb9996
+              name: 'Interface [{#SNMPVALUE}] Out traffic'
+              type: DEPENDENT
+              key: 'cdata.if.outbps[{#SNMPINDEX}]'
+              value_type: FLOAT
+              units: bps
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+$'
+                  error_handler: DISCARD_VALUE
+                - type: CHANGE_PER_SECOND
+                - type: MULTIPLIER
+                  parameters:
+                    - '8'
+              master_item:
+                key: cdata.if.outoctets
+              tags:
+                - tag: component
+                  value: olt
+                - tag: ifindex
+                  value: '{#SNMPINDEX}'
+                - tag: interface
+                  value: '{#SNMPVALUE}'
+                - tag: scope
+                  value: port
+            - uuid: 71749643634a4897892c8d35e34ac94b
+              name: 'Interface [{#SNMPVALUE}] Out errors'
+              type: DEPENDENT
+              key: 'cdata.if.outerrors[{#SNMPINDEX}]'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+$'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: cdata.if.outerrors
+              tags:
+                - tag: component
+                  value: olt
+                - tag: ifindex
+                  value: '{#SNMPINDEX}'
+                - tag: interface
+                  value: '{#SNMPVALUE}'
+                - tag: scope
+                  value: port
+              trigger_prototypes:
+                - uuid: 298d62aac78c4439a198a00b1c0a180f
+                  expression: 'change(/C-Data_FD1304E-B1_EPON_OLT/cdata.if.outerrors[{#SNMPINDEX}]) > {$CDATA.IF.ERRORS_WARN}'
+                  recovery_mode: RECOVERY_EXPRESSION
+                  recovery_expression: 'change(/C-Data_FD1304E-B1_EPON_OLT/cdata.if.outerrors[{#SNMPINDEX}]) = 0'
+                  name: '[{#SNMPVALUE}] output errors detected'
+                  priority: WARNING
+                  tags:
+                    - tag: component
+                      value: olt
+                    - tag: ifindex
+                      value: '{#SNMPINDEX}'
+                    - tag: interface
+                      value: '{#SNMPVALUE}'
+                    - tag: scope
+                      value: port
+            - uuid: 5cf3069135d342cfa1dca955523ed324
+              name: 'Interface [{#SNMPVALUE}] Out octets'
+              type: DEPENDENT
+              key: 'cdata.if.outoctets[{#SNMPINDEX}]'
+              units: B
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+$'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: cdata.if.outoctets
+              tags:
+                - tag: component
+                  value: olt
+                - tag: ifindex
+                  value: '{#SNMPINDEX}'
+                - tag: interface
+                  value: '{#SNMPVALUE}'
+                - tag: scope
+                  value: port
+            - uuid: d9b768bbf1ae4150858e8aaa74da5437
+              name: 'Interface [{#SNMPVALUE}] Speed'
+              type: DEPENDENT
+              key: 'cdata.if.speed[{#SNMPINDEX}]'
+              units: bps
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+$'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: cdata.if.speed
+              tags:
+                - tag: component
+                  value: olt
+                - tag: ifindex
+                  value: '{#SNMPINDEX}'
+                - tag: interface
+                  value: '{#SNMPVALUE}'
+                - tag: scope
+                  value: port
+          trigger_prototypes:
+            - uuid: 3765be01b1d249e7a7606166ac45612d
+              expression: 'last(/C-Data_FD1304E-B1_EPON_OLT/cdata.if.admin[{#SNMPINDEX}]) = 1 and last(/C-Data_FD1304E-B1_EPON_OLT/cdata.if.oper[{#SNMPINDEX}]) = 2'
+              recovery_mode: RECOVERY_EXPRESSION
+              recovery_expression: 'last(/C-Data_FD1304E-B1_EPON_OLT/cdata.if.oper[{#SNMPINDEX}]) = 1'
+              name: '[{#SNMPVALUE}] port is down'
+              priority: AVERAGE
+              tags:
+                - tag: component
+                  value: olt
+                - tag: ifindex
+                  value: '{#SNMPINDEX}'
+                - tag: interface
+                  value: '{#SNMPVALUE}'
+                - tag: scope
+                  value: port
+          graph_prototypes:
+            - uuid: 249b73b505b545f2b1088e219362ec21
+              name: 'Interface [{#SNMPVALUE}] errors'
+              graph_items:
+                - color: F44336
+                  item:
+                    host: C-Data_FD1304E-B1_EPON_OLT
+                    key: 'cdata.if.inerrors[{#SNMPINDEX}]'
+                - sortorder: '1'
+                  color: FF9800
+                  item:
+                    host: C-Data_FD1304E-B1_EPON_OLT
+                    key: 'cdata.if.outerrors[{#SNMPINDEX}]'
+            - uuid: 2e908bd8326d4c7f9780e025a5511338
+              name: 'Interface [{#SNMPVALUE}] traffic'
+              graph_items:
+                - color: 4CAF50
+                  item:
+                    host: C-Data_FD1304E-B1_EPON_OLT
+                    key: 'cdata.if.inbps[{#SNMPINDEX}]'
+                - sortorder: '1'
+                  color: 1E90FF
+                  item:
+                    host: C-Data_FD1304E-B1_EPON_OLT
+                    key: 'cdata.if.outbps[{#SNMPINDEX}]'
+          master_item:
+            key: cdata.if.name
+        - uuid: 4307563d7905432a89a6f68525401339
+          name: 'ONU discovery'
+          type: DEPENDENT
+          key: cdata.onu.lld
+          description: 'Discovers EPON ONUs by SNMP walk of the ONU name table.'
+          item_prototypes:
+            - uuid: 54004544eac14018bdf63856c17b8be0
+              name: 'ONU [{#SNMPVALUE}] Bias current'
+              type: DEPENDENT
+              key: 'cdata.onu.bias[{#SNMPINDEX}]'
+              value_type: FLOAT
+              units: mA
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+(\.[0-9]+)?$'
+                  error_handler: DISCARD_VALUE
+                - type: MULTIPLIER
+                  parameters:
+                    - '0.001'
+              master_item:
+                key: cdata.onu.bias
+              tags:
+                - tag: component
+                  value: olt
+                - tag: onu_id
+                  value: '{#SNMPINDEX}'
+                - tag: scope
+                  value: onu
+                - tag: subscriber
+                  value: '{#SNMPVALUE}'
+            - uuid: d728710e1a09478ba3809b00e3639108
+              name: 'ONU [{#SNMPVALUE}] Rx power'
+              type: DEPENDENT
+              key: 'cdata.onu.rx[{#SNMPINDEX}]'
+              value_type: FLOAT
+              units: dBm
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+(\.[0-9]+)?$'
+                  error_handler: DISCARD_VALUE
+                - type: MULTIPLIER
+                  parameters:
+                    - '0.01'
+              master_item:
+                key: cdata.onu.rx
+              tags:
+                - tag: component
+                  value: olt
+                - tag: onu_id
+                  value: '{#SNMPINDEX}'
+                - tag: scope
+                  value: onu
+                - tag: subscriber
+                  value: '{#SNMPVALUE}'
+              trigger_prototypes:
+                - uuid: 31a9a6cf64c54c95a473e33517d82b1c
+                  expression: 'nodata(/C-Data_FD1304E-B1_EPON_OLT/cdata.onu.rx[{#SNMPINDEX}],20m) = 1'
+                  name: 'ONU [{#SNMPVALUE}] optical data missing (offline/no signal)'
+                  priority: WARNING
+                  tags:
+                    - tag: component
+                      value: olt
+                    - tag: onu_id
+                      value: '{#SNMPINDEX}'
+                    - tag: scope
+                      value: onu
+                    - tag: subscriber
+                      value: '{#SNMPVALUE}'
+                - uuid: 84a8e2af483448288417abf132d3e718
+                  expression: 'last(/C-Data_FD1304E-B1_EPON_OLT/cdata.onu.rx[{#SNMPINDEX}]) < {$CDATA.ONU.RX_MIN}'
+                  recovery_mode: RECOVERY_EXPRESSION
+                  recovery_expression: 'last(/C-Data_FD1304E-B1_EPON_OLT/cdata.onu.rx[{#SNMPINDEX}]) > {$CDATA.ONU.RX_OK}'
+                  name: 'ONU [{#SNMPVALUE}] Rx power below {$CDATA.ONU.RX_MIN} dBm'
+                  priority: HIGH
+                  tags:
+                    - tag: component
+                      value: olt
+                    - tag: onu_id
+                      value: '{#SNMPINDEX}'
+                    - tag: scope
+                      value: onu
+                    - tag: subscriber
+                      value: '{#SNMPVALUE}'
+            - uuid: 072249a78c2e4778b8379ba3660991a8
+              name: 'ONU [{#SNMPVALUE}] State'
+              type: DEPENDENT
+              key: 'cdata.onu.state[{#SNMPINDEX}]'
+              valuemap:
+                name: 'C-Data ONU state'
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+$'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: cdata.onu.state
+              tags:
+                - tag: component
+                  value: olt
+                - tag: onu_id
+                  value: '{#SNMPINDEX}'
+                - tag: scope
+                  value: onu
+                - tag: subscriber
+                  value: '{#SNMPVALUE}'
+              trigger_prototypes:
+                - uuid: 34537c49166c42a5b1b218f616c0379f
+                  expression: 'last(/C-Data_FD1304E-B1_EPON_OLT/cdata.onu.state[{#SNMPINDEX}]) = 2'
+                  recovery_mode: RECOVERY_EXPRESSION
+                  recovery_expression: 'last(/C-Data_FD1304E-B1_EPON_OLT/cdata.onu.state[{#SNMPINDEX}]) = 1'
+                  name: 'ONU [{#SNMPVALUE}] offline'
+                  priority: AVERAGE
+                  tags:
+                    - tag: component
+                      value: olt
+                    - tag: onu_id
+                      value: '{#SNMPINDEX}'
+                    - tag: scope
+                      value: onu
+                    - tag: subscriber
+                      value: '{#SNMPVALUE}'
+            - uuid: 7b940a81108a4c129b378e37e164d308
+              name: 'ONU [{#SNMPVALUE}] Temperature'
+              type: DEPENDENT
+              key: 'cdata.onu.temp[{#SNMPINDEX}]'
+              value_type: FLOAT
+              units: C
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+(\.[0-9]+)?$'
+                  error_handler: DISCARD_VALUE
+                - type: MULTIPLIER
+                  parameters:
+                    - '0.0001'
+              master_item:
+                key: cdata.onu.temp
+              tags:
+                - tag: component
+                  value: olt
+                - tag: onu_id
+                  value: '{#SNMPINDEX}'
+                - tag: scope
+                  value: onu
+                - tag: subscriber
+                  value: '{#SNMPVALUE}'
+              trigger_prototypes:
+                - uuid: 328da9d5bf0e4342a93972afce55e536
+                  expression: 'last(/C-Data_FD1304E-B1_EPON_OLT/cdata.onu.temp[{#SNMPINDEX}]) > {$CDATA.ONU.TEMP_MAX}'
+                  recovery_mode: RECOVERY_EXPRESSION
+                  recovery_expression: 'last(/C-Data_FD1304E-B1_EPON_OLT/cdata.onu.temp[{#SNMPINDEX}]) < {$CDATA.ONU.TEMP_MAX} - 5'
+                  name: 'ONU [{#SNMPVALUE}] temperature above {$CDATA.ONU.TEMP_MAX} C'
+                  priority: WARNING
+                  tags:
+                    - tag: component
+                      value: olt
+                    - tag: onu_id
+                      value: '{#SNMPINDEX}'
+                    - tag: scope
+                      value: onu
+                    - tag: subscriber
+                      value: '{#SNMPVALUE}'
+            - uuid: 8369b2a5a31347b480998b57a04afd42
+              name: 'ONU [{#SNMPVALUE}] Tx power'
+              type: DEPENDENT
+              key: 'cdata.onu.tx[{#SNMPINDEX}]'
+              value_type: FLOAT
+              units: dBm
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+(\.[0-9]+)?$'
+                  error_handler: DISCARD_VALUE
+                - type: MULTIPLIER
+                  parameters:
+                    - '0.01'
+              master_item:
+                key: cdata.onu.tx
+              tags:
+                - tag: component
+                  value: olt
+                - tag: onu_id
+                  value: '{#SNMPINDEX}'
+                - tag: scope
+                  value: onu
+                - tag: subscriber
+                  value: '{#SNMPVALUE}'
+              trigger_prototypes:
+                - uuid: ad4c5d43f2734a109aeeee80933d4983
+                  expression: 'last(/C-Data_FD1304E-B1_EPON_OLT/cdata.onu.tx[{#SNMPINDEX}]) < 0 or last(/C-Data_FD1304E-B1_EPON_OLT/cdata.onu.tx[{#SNMPINDEX}]) > 5'
+                  recovery_mode: RECOVERY_EXPRESSION
+                  recovery_expression: 'last(/C-Data_FD1304E-B1_EPON_OLT/cdata.onu.tx[{#SNMPINDEX}]) >= 0 and last(/C-Data_FD1304E-B1_EPON_OLT/cdata.onu.tx[{#SNMPINDEX}]) <= 5'
+                  name: 'ONU [{#SNMPVALUE}] Tx power out of range'
+                  priority: WARNING
+                  tags:
+                    - tag: component
+                      value: olt
+                    - tag: onu_id
+                      value: '{#SNMPINDEX}'
+                    - tag: scope
+                      value: onu
+                    - tag: subscriber
+                      value: '{#SNMPVALUE}'
+            - uuid: 98d992a84343447994c08003fa49af00
+              name: 'ONU [{#SNMPVALUE}] Uptime'
+              type: DEPENDENT
+              key: 'cdata.onu.uptime[{#SNMPINDEX}]'
+              units: uptime
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+$'
+                  error_handler: DISCARD_VALUE
+              master_item:
+                key: cdata.onu.uptime
+              tags:
+                - tag: component
+                  value: olt
+                - tag: onu_id
+                  value: '{#SNMPINDEX}'
+                - tag: scope
+                  value: onu
+                - tag: subscriber
+                  value: '{#SNMPVALUE}'
+            - uuid: 4c319b6d83f245dc876207961350acd3
+              name: 'ONU [{#SNMPVALUE}] Voltage'
+              type: DEPENDENT
+              key: 'cdata.onu.voltage[{#SNMPINDEX}]'
+              value_type: FLOAT
+              units: V
+              preprocessing:
+                - type: JAVASCRIPT
+                  parameters:
+                    - |
+                      var id = "{#SNMPINDEX}".replace(/^#/, "");
+                      var data = JSON.parse(value);
+                      for (var i = 0; i < data.length; i++) {
+                          if (data[i].idx === id) { return data[i].val; }
+                      }
+                      return "";
+                - type: MATCHES_REGEX
+                  parameters:
+                    - '^-?[0-9]+(\.[0-9]+)?$'
+                  error_handler: DISCARD_VALUE
+                - type: MULTIPLIER
+                  parameters:
+                    - '0.001'
+              master_item:
+                key: cdata.onu.voltage
+              tags:
+                - tag: component
+                  value: olt
+                - tag: onu_id
+                  value: '{#SNMPINDEX}'
+                - tag: scope
+                  value: onu
+                - tag: subscriber
+                  value: '{#SNMPVALUE}'
+          graph_prototypes:
+            - uuid: f1c7351ec5ad47ef9e94046af0261eb6
+              name: 'ONU [{#SNMPVALUE}] optical signal'
+              graph_items:
+                - color: 1E90FF
+                  item:
+                    host: C-Data_FD1304E-B1_EPON_OLT
+                    key: 'cdata.onu.rx[{#SNMPINDEX}]'
+                - sortorder: '1'
+                  color: FF9800
+                  item:
+                    host: C-Data_FD1304E-B1_EPON_OLT
+                    key: 'cdata.onu.tx[{#SNMPINDEX}]'
+          master_item:
+            key: cdata.onu.name
+      macros:
+        - macro: '{$CDATA.IF.ERRORS_WARN}'
+          value: '1'
+          description: 'Interface error delta threshold'
+        - macro: '{$CDATA.ONU.RX_MIN}'
+          value: '-26'
+          description: 'Warning: ONU Rx power below this (dBm)'
+        - macro: '{$CDATA.ONU.RX_OK}'
+          value: '-24'
+          description: 'Recovery threshold for ONU Rx power (dBm)'
+        - macro: '{$CDATA.ONU.TEMP_MAX}'
+          value: '60'
+          description: 'Max ONU temperature (C)'
+      valuemaps:
+        - uuid: a54bf7445833476cb021f37602197397
+          name: 'C-Data interface state'
+          mappings:
+            - value: '1'
+              newvalue: up
+            - value: '2'
+              newvalue: down
+        - uuid: b9e256c145fc4acd83b20acffada673d
+          name: 'C-Data ONU state'
+          mappings:
+            - value: '1'
+              newvalue: Online
+            - value: '2'
+              newvalue: Offline
